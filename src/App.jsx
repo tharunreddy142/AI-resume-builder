@@ -223,70 +223,84 @@ function evaluateBullets(text) {
   }))
 }
 
-function calculateAtsV1(data) {
-  const summaryWords = data.summary.trim().split(/\s+/).filter(Boolean).length
-  const hasStrongSummary = summaryWords >= 40 && summaryWords <= 120
+function calculateResumeScore(data) {
+  const checks = []
+  const summary = data.summary.trim()
+  const actionVerbRegex = new RegExp(`\\b(${ACTION_VERBS.join('|')})\\b`, 'i')
+  const hasExperienceWithBullets = data.experience.some(
+    (item) => isExperiencePopulated(item) && extractBullets(item.details).length > 0,
+  )
 
-  const projectEntries = data.projects.filter(isProjectPopulated)
-  const experienceEntries = data.experience.filter(isExperiencePopulated)
-  const skillItems = getAllSkills(data)
+  checks.push({
+    passed: Boolean(data.personal.name.trim()),
+    points: 10,
+    suggestion: 'Add your full name (+10 points).',
+  })
+  checks.push({
+    passed: Boolean(data.personal.email.trim()),
+    points: 10,
+    suggestion: 'Add an email address (+10 points).',
+  })
+  checks.push({
+    passed: summary.length > 50,
+    points: 10,
+    suggestion: 'Add a professional summary (+10 points).',
+  })
+  checks.push({
+    passed: hasExperienceWithBullets,
+    points: 15,
+    suggestion: 'Add at least one experience entry with bullet points (+15 points).',
+  })
+  checks.push({
+    passed: data.education.some(isEducationPopulated),
+    points: 10,
+    suggestion: 'Add at least one education entry (+10 points).',
+  })
+  checks.push({
+    passed: getAllSkills(data).length >= 5,
+    points: 10,
+    suggestion: 'Add at least 5 skills (+10 points).',
+  })
+  checks.push({
+    passed: data.projects.some(isProjectPopulated),
+    points: 10,
+    suggestion: 'Add at least one project (+10 points).',
+  })
+  checks.push({
+    passed: Boolean(data.personal.phone.trim()),
+    points: 5,
+    suggestion: 'Add your phone number (+5 points).',
+  })
+  checks.push({
+    passed: Boolean(data.links.linkedin.trim()),
+    points: 5,
+    suggestion: 'Add your LinkedIn URL (+5 points).',
+  })
+  checks.push({
+    passed: Boolean(data.links.github.trim()),
+    points: 5,
+    suggestion: 'Add your GitHub URL (+5 points).',
+  })
+  checks.push({
+    passed: actionVerbRegex.test(summary),
+    points: 10,
+    suggestion: 'Use action verbs in your summary (built, led, designed, improved) (+10 points).',
+  })
 
-  const hasLink = Boolean(data.links.github.trim() || data.links.linkedin.trim())
-  const completeEducation =
-    data.education.filter(isEducationPopulated).length > 0 &&
-    data.education.filter(isEducationPopulated).every(
-      (item) => item.school.trim() && item.degree.trim() && item.start.trim() && item.end.trim(),
-    )
+  const score = Math.min(100, checks.reduce((acc, item) => acc + (item.passed ? item.points : 0), 0))
+  const suggestions = checks.filter((item) => !item.passed).map((item) => item.suggestion)
 
-  const quantifiedText = [
-    ...experienceEntries.map((item) => item.details),
-    ...projectEntries.map((item) => item.description),
-  ]
-  const hasQuantifiedImpact = quantifiedText.some((text) => hasNumber(text || ''))
-
-  const rawScore =
-    (hasStrongSummary ? 15 : 0) +
-    (projectEntries.length >= 2 ? 10 : 0) +
-    (experienceEntries.length >= 1 ? 10 : 0) +
-    (skillItems.length >= 8 ? 10 : 0) +
-    (hasLink ? 10 : 0) +
-    (hasQuantifiedImpact ? 15 : 0) +
-    (completeEducation ? 10 : 0)
-
-  const score = Math.min(100, rawScore)
-  const suggestions = []
-
-  if (!hasStrongSummary) suggestions.push('Write a stronger summary (40-120 words).')
-  if (projectEntries.length < 2) suggestions.push('Add at least 2 projects.')
-  if (!hasQuantifiedImpact) suggestions.push('Add measurable impact (numbers) in bullets.')
-  if (skillItems.length < 8) suggestions.push('Add more skills (target 8+).')
-  if (!hasLink) suggestions.push('Add a GitHub or LinkedIn link.')
-  if (experienceEntries.length < 1) suggestions.push('Add at least 1 experience entry.')
-  if (!completeEducation) suggestions.push('Complete all education fields (school, degree, start, end).')
-
-  return {
-    score,
-    suggestions: suggestions.slice(0, 3),
+  let statusLabel = 'Needs Work'
+  let statusTone = 'bad'
+  if (score > 40 && score <= 70) {
+    statusLabel = 'Getting There'
+    statusTone = 'mid'
+  } else if (score > 70) {
+    statusLabel = 'Strong Resume'
+    statusTone = 'good'
   }
-}
 
-function topImprovements(data) {
-  const summaryWords = data.summary.trim().split(/\s+/).filter(Boolean).length
-  const projectEntries = data.projects.filter(isProjectPopulated)
-  const experienceEntries = data.experience.filter(isExperiencePopulated)
-  const skillItems = getAllSkills(data)
-  const hasQuantifiedImpact =
-    [...experienceEntries.map((item) => item.details), ...projectEntries.map((item) => item.description)]
-      .some((text) => hasNumber(text || ''))
-
-  const items = []
-  if (projectEntries.length < 2) items.push('Add at least 2 projects to strengthen technical depth.')
-  if (!hasQuantifiedImpact) items.push('Add measurable impact (numbers) in experience or project bullets.')
-  if (summaryWords < 40) items.push('Expand your summary to at least 40 words.')
-  if (skillItems.length < 8) items.push('Expand your skills list to 8+ relevant skills.')
-  if (experienceEntries.length < 1) items.push('Add experience, internship, or project work with outcomes.')
-
-  return items.slice(0, 3)
+  return { score, suggestions, statusLabel, statusTone }
 }
 
 function getExportWarnings(data) {
@@ -699,41 +713,61 @@ function ResumeShell({ data, template = 'classic', monochrome = false, accentCol
   )
 }
 
-function ScoreCard({ score, suggestions, improvements }) {
+function ScoreCard({ scoreData }) {
   return (
     <section className="card score-card">
       <div className="card-header">ATS Readiness Score</div>
       <div className="card-body">
         <div className="score-row">
-          <span className="score-value">{score}</span>
+          <span className="score-value">{scoreData.score}</span>
           <span className="score-max">/100</span>
         </div>
-        <div className="score-track" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={score}>
-          <div className="score-fill" style={{ width: `${score}%` }} />
+        <div className="score-track" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={scoreData.score}>
+          <div className="score-fill" style={{ width: `${scoreData.score}%` }} />
         </div>
 
-        {suggestions.length > 0 ? (
+        {scoreData.suggestions.length > 0 ? (
           <ul className="suggestion-list">
-            {suggestions.map((text, index) => (
+            {scoreData.suggestions.map((text, index) => (
               <li key={index}>{text}</li>
             ))}
           </ul>
         ) : (
-          <p className="suggestion-clear">Core ATS checks passed for v1.</p>
+          <p className="suggestion-clear">All core ATS checks are complete.</p>
         )}
+      </div>
+    </section>
+  )
+}
 
-        <div className="improvement-block">
-          <h4>Top 3 Improvements</h4>
-          {improvements.length > 0 ? (
-            <ul className="suggestion-list">
-              {improvements.map((item, index) => (
-                <li key={index}>{item}</li>
-              ))}
-            </ul>
-          ) : (
-            <p className="suggestion-clear">No immediate improvements required for this ruleset.</p>
-          )}
+function PreviewAtsCard({ scoreData }) {
+  return (
+    <section className="card preview-ats-card">
+      <div className="ats-circle-wrap">
+        <div
+          className={`ats-circle ats-${scoreData.statusTone}`}
+          style={{ '--progress': `${scoreData.score}%` }}
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={scoreData.score}
+        >
+          <div className="ats-circle-inner">{scoreData.score}</div>
         </div>
+        <p className={`ats-status ats-${scoreData.statusTone}`}>{scoreData.statusLabel}</p>
+      </div>
+
+      <div className="improvement-block">
+        <h4>Improvement Suggestions</h4>
+        {scoreData.suggestions.length > 0 ? (
+          <ul className="suggestion-list">
+            {scoreData.suggestions.map((item, index) => (
+              <li key={index}>{item}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="suggestion-clear">No missing ATS items detected.</p>
+        )}
       </div>
     </section>
   )
@@ -743,7 +777,6 @@ function BuilderPage({
   data,
   setData,
   scoreData,
-  improvements,
   selectedTemplate,
   setSelectedTemplate,
   accentColor,
@@ -1102,7 +1135,7 @@ function BuilderPage({
               />
             </div>
           </section>
-          <ScoreCard score={scoreData.score} suggestions={scoreData.suggestions} improvements={improvements} />
+          <ScoreCard scoreData={scoreData} />
           <div className="card preview-card">
             <div className="card-header">Live Preview</div>
             <div className="card-body">
@@ -1115,7 +1148,7 @@ function BuilderPage({
   )
 }
 
-function PreviewPage({ data, selectedTemplate, setSelectedTemplate, accentColor, setAccentColor }) {
+function PreviewPage({ data, scoreData, selectedTemplate, setSelectedTemplate, accentColor, setAccentColor }) {
   const [copyStatus, setCopyStatus] = useState('')
   const [toastMessage, setToastMessage] = useState('')
   const [showWarning, setShowWarning] = useState(false)
@@ -1156,6 +1189,8 @@ function PreviewPage({ data, selectedTemplate, setSelectedTemplate, accentColor,
           <button type="button" className="btn btn-primary" onClick={handleDownloadPdf}>Download PDF</button>
           <button type="button" className="btn btn-secondary" onClick={handleCopyText}>Copy Resume as Text</button>
         </section>
+
+        <PreviewAtsCard scoreData={scoreData} />
 
         {showWarning && exportWarnings.length > 0 ? (
           <section className="card export-warning">
@@ -1230,8 +1265,7 @@ export default function App() {
     localStorage.setItem(ACCENT_KEY, selectedAccentColor)
   }, [selectedAccentColor])
 
-  const scoreData = useMemo(() => calculateAtsV1(resumeData), [resumeData])
-  const improvements = useMemo(() => topImprovements(resumeData), [resumeData])
+  const scoreData = useMemo(() => calculateResumeScore(resumeData), [resumeData])
 
   return (
     <Routes>
@@ -1243,7 +1277,6 @@ export default function App() {
             data={resumeData}
             setData={setResumeData}
             scoreData={scoreData}
-            improvements={improvements}
             selectedTemplate={selectedTemplate}
             setSelectedTemplate={setSelectedTemplate}
             accentColor={selectedAccentColor}
@@ -1256,6 +1289,7 @@ export default function App() {
         element={
           <PreviewPage
             data={resumeData}
+            scoreData={scoreData}
             selectedTemplate={selectedTemplate}
             setSelectedTemplate={setSelectedTemplate}
             accentColor={selectedAccentColor}
