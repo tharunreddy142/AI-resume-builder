@@ -324,6 +324,29 @@
   margin-bottom: var(--spacing-md);
 }
 
+.preview-toolbar {
+  margin-bottom: var(--spacing-md);
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}
+
+.export-warning {
+  margin-bottom: var(--spacing-sm);
+  border-left: 3px solid #111111;
+}
+
+.export-warning p {
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
+}
+
+.copy-status {
+  margin-bottom: var(--spacing-sm);
+  font-size: var(--font-size-small);
+  color: var(--color-text-secondary);
+}
+
 .proof-main-container {
   flex: 1;
   display: flex;
@@ -341,6 +364,13 @@
 code {
   font-family: var(--font-mono);
   font-size: var(--font-size-code);
+}
+
+.resume-shell,
+.resume-block,
+.resume-subblock,
+.resume-bullet {
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 1024px) {
@@ -361,5 +391,64 @@ code {
   .row-between {
     align-items: flex-start;
     flex-direction: column;
+  }
+}
+
+@media print {
+  @page {
+    margin: 0.6in;
+  }
+
+  html,
+  body,
+  #root {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .print-target,
+  .print-target * {
+    visibility: visible;
+  }
+
+  .print-target {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  .resume-shell {
+    border: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    min-height: auto;
+    padding: 0;
+  }
+
+  .resume-meta,
+  .resume-block p,
+  .resume-block h3 {
+    color: #000000 !important;
+  }
+
+  .resume-block {
+    margin-bottom: 14px;
+    break-inside: avoid-page;
+    page-break-inside: avoid;
+  }
+
+  .resume-subblock {
+    break-inside: avoid-page;
+    page-break-inside: avoid;
+  }
+
+  .resume-bullet {
+    break-inside: avoid-page;
+    page-break-inside: avoid;
   }
 }

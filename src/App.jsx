@@ -227,6 +227,75 @@ function topImprovements(data) {
   return items.slice(0, 3)
 }
 
+function getExportWarnings(data) {
+  const hasName = Boolean(data.personal.name.trim())
+  const hasExperience = data.experience.some(isExperiencePopulated)
+  const hasProject = data.projects.some(isProjectPopulated)
+  const warnings = []
+
+  if (!hasName) warnings.push('Name is missing.')
+  if (!hasExperience && !hasProject) warnings.push('Add at least one project or experience entry.')
+  return warnings
+}
+
+function buildResumePlainText(data) {
+  const educationEntries = data.education.filter(isEducationPopulated)
+  const experienceEntries = data.experience.filter(isExperiencePopulated)
+  const projectEntries = data.projects.filter(isProjectPopulated)
+  const skills = data.skills
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+  const contact = [data.personal.email.trim(), data.personal.phone.trim(), data.personal.location.trim()]
+    .filter(Boolean)
+    .join(' | ')
+
+  const lines = []
+  lines.push(data.personal.name.trim() || 'Name')
+  lines.push(`Contact: ${contact || 'N/A'}`)
+  lines.push('')
+  lines.push('Summary')
+  lines.push(data.summary.trim() || 'N/A')
+  lines.push('')
+  lines.push('Education')
+  if (educationEntries.length > 0) {
+    educationEntries.forEach((item) => {
+      lines.push(`- ${item.degree.trim() || 'Degree'} ${item.school.trim() ? `- ${item.school.trim()}` : ''} ${(item.start.trim() || item.end.trim()) ? `(${item.start.trim()} - ${item.end.trim()})` : ''}`.trim())
+    })
+  } else {
+    lines.push('N/A')
+  }
+  lines.push('')
+  lines.push('Experience')
+  if (experienceEntries.length > 0) {
+    experienceEntries.forEach((item) => {
+      lines.push(`- ${item.role.trim() || 'Role'} ${item.company.trim() ? `- ${item.company.trim()}` : ''} ${(item.start.trim() || item.end.trim()) ? `(${item.start.trim()} - ${item.end.trim()})` : ''}`.trim())
+      extractBullets(item.details).forEach((bullet) => lines.push(`  * ${bullet}`))
+    })
+  } else {
+    lines.push('N/A')
+  }
+  lines.push('')
+  lines.push('Projects')
+  if (projectEntries.length > 0) {
+    projectEntries.forEach((item) => {
+      lines.push(`- ${item.name.trim() || 'Project'}${item.tech.trim() ? ` | ${item.tech.trim()}` : ''}`)
+      extractBullets(item.description).forEach((bullet) => lines.push(`  * ${bullet}`))
+    })
+  } else {
+    lines.push('N/A')
+  }
+  lines.push('')
+  lines.push('Skills')
+  lines.push(skills.length > 0 ? skills.join(', ') : 'N/A')
+  lines.push('')
+  lines.push('Links')
+  lines.push(`GitHub: ${data.links.github.trim() || 'N/A'}`)
+  lines.push(`LinkedIn: ${data.links.linkedin.trim() || 'N/A'}`)
+
+  return lines.join('\n')
+}
+
 function TopNav() {
   return (
     <header className="topbar app-nav">
@@ -594,6 +663,25 @@ function BuilderPage({ data, setData, scoreData, improvements, selectedTemplate,
 }
 
 function PreviewPage({ data, selectedTemplate, setSelectedTemplate }) {
+  const [copyStatus, setCopyStatus] = useState('')
+  const [showWarning, setShowWarning] = useState(false)
+  const exportWarnings = useMemo(() => getExportWarnings(data), [data])
+
+  const handlePrint = () => {
+    if (exportWarnings.length > 0) setShowWarning(true)
+    window.print()
+  }
+
+  const handleCopyText = async () => {
+    if (exportWarnings.length > 0) setShowWarning(true)
+    try {
+      await navigator.clipboard.writeText(buildResumePlainText(data))
+      setCopyStatus('Resume text copied.')
+    } catch {
+      setCopyStatus('Could not copy resume text.')
+    }
+  }
+
   return (
     <div className="page-wrapper preview-page">
       <TopNav />
@@ -604,7 +692,24 @@ function PreviewPage({ data, selectedTemplate, setSelectedTemplate }) {
             <TemplateTabs selectedTemplate={selectedTemplate} onSelect={setSelectedTemplate} />
           </div>
         </section>
-        <ResumeShell data={data} template={selectedTemplate} monochrome />
+        <section className="card preview-toolbar">
+          <button type="button" className="btn btn-primary" onClick={handlePrint}>Print / Save as PDF</button>
+          <button type="button" className="btn btn-secondary" onClick={handleCopyText}>Copy Resume as Text</button>
+        </section>
+
+        {showWarning && exportWarnings.length > 0 ? (
+          <section className="card export-warning">
+            <p>Your resume may look incomplete.</p>
+          </section>
+        ) : null}
+
+        {copyStatus ? (
+          <p className="copy-status">{copyStatus}</p>
+        ) : null}
+
+        <div className="print-target">
+          <ResumeShell data={data} template={selectedTemplate} monochrome />
+        </div>
       </main>
     </div>
   )
