@@ -1,5 +1,7 @@
 import { Link, Navigate, Route, Routes } from 'react-router-dom'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+
+const STORAGE_KEY = 'resumeBuilderData'
 
 const emptyResume = {
   personal: { name: '', email: '', phone: '', location: '' },
@@ -19,7 +21,7 @@ const sampleResume = {
     location: 'San Jose, CA',
   },
   summary:
-    'Frontend engineer focused on shipping clean, performant web interfaces with strong product thinking.',
+    'Frontend engineer with 3+ years building recruiter workflows. Improved application review throughput by 35%, shipped reusable resume parsing components, and collaborated closely with product and design to deliver faster iteration cycles and cleaner candidate experiences.',
   education: [{ school: 'State University', degree: 'B.S. Computer Science', start: '2019', end: '2023' }],
   experience: [
     {
@@ -27,21 +29,140 @@ const sampleResume = {
       role: 'Software Engineer',
       start: '2023',
       end: 'Present',
-      details: 'Built dashboard features and internal tools for recruiter workflow automation.',
+      details: 'Improved conversion by 22% using A/B experiments. Reduced page load time by 1.4s.',
     },
   ],
   projects: [
     {
       name: 'TaskFlow',
       tech: 'React, Node.js',
-      description: 'Collaborative project tracker with role-based access and real-time notifications.',
+      description: 'Collaborative tracker used by 2k+ users with weekly reports.',
+    },
+    {
+      name: 'Resume Lens',
+      tech: 'TypeScript, PostgreSQL',
+      description: 'Generated keyword insights and improved relevance score by 18%.',
     },
   ],
-  skills: 'React, JavaScript, TypeScript, Node.js, SQL, REST APIs',
+  skills: 'React, JavaScript, TypeScript, Node.js, SQL, REST APIs, Git, Testing',
   links: {
     github: 'github.com/aaravsharma',
     linkedin: 'linkedin.com/in/aaravsharma',
   },
+}
+
+function normalizeResume(raw) {
+  if (!raw || typeof raw !== 'object') return emptyResume
+
+  return {
+    personal: {
+      name: raw.personal?.name || '',
+      email: raw.personal?.email || '',
+      phone: raw.personal?.phone || '',
+      location: raw.personal?.location || '',
+    },
+    summary: raw.summary || '',
+    education:
+      Array.isArray(raw.education) && raw.education.length > 0
+        ? raw.education.map((item) => ({
+            school: item?.school || '',
+            degree: item?.degree || '',
+            start: item?.start || '',
+            end: item?.end || '',
+          }))
+        : [{ school: '', degree: '', start: '', end: '' }],
+    experience:
+      Array.isArray(raw.experience) && raw.experience.length > 0
+        ? raw.experience.map((item) => ({
+            company: item?.company || '',
+            role: item?.role || '',
+            start: item?.start || '',
+            end: item?.end || '',
+            details: item?.details || '',
+          }))
+        : [{ company: '', role: '', start: '', end: '', details: '' }],
+    projects:
+      Array.isArray(raw.projects) && raw.projects.length > 0
+        ? raw.projects.map((item) => ({
+            name: item?.name || '',
+            tech: item?.tech || '',
+            description: item?.description || '',
+          }))
+        : [{ name: '', tech: '', description: '' }],
+    skills: raw.skills || '',
+    links: {
+      github: raw.links?.github || '',
+      linkedin: raw.links?.linkedin || '',
+    },
+  }
+}
+
+function isEducationPopulated(item) {
+  return Boolean(item.school.trim() || item.degree.trim() || item.start.trim() || item.end.trim())
+}
+
+function isExperiencePopulated(item) {
+  return Boolean(
+    item.company.trim() || item.role.trim() || item.start.trim() || item.end.trim() || item.details.trim(),
+  )
+}
+
+function isProjectPopulated(item) {
+  return Boolean(item.name.trim() || item.tech.trim() || item.description.trim())
+}
+
+function hasNumber(text) {
+  return /\d+\s*(%|x|k|m)?/i.test(text)
+}
+
+function calculateAtsV1(data) {
+  const summaryWords = data.summary.trim().split(/\s+/).filter(Boolean).length
+  const hasStrongSummary = summaryWords >= 40 && summaryWords <= 120
+
+  const projectEntries = data.projects.filter(isProjectPopulated)
+  const experienceEntries = data.experience.filter(isExperiencePopulated)
+  const skillItems = data.skills
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+
+  const hasLink = Boolean(data.links.github.trim() || data.links.linkedin.trim())
+  const completeEducation =
+    data.education.filter(isEducationPopulated).length > 0 &&
+    data.education.filter(isEducationPopulated).every(
+      (item) => item.school.trim() && item.degree.trim() && item.start.trim() && item.end.trim(),
+    )
+
+  const quantifiedText = [
+    ...experienceEntries.map((item) => item.details),
+    ...projectEntries.map((item) => item.description),
+  ]
+  const hasQuantifiedImpact = quantifiedText.some((text) => hasNumber(text || ''))
+
+  const rawScore =
+    (hasStrongSummary ? 15 : 0) +
+    (projectEntries.length >= 2 ? 10 : 0) +
+    (experienceEntries.length >= 1 ? 10 : 0) +
+    (skillItems.length >= 8 ? 10 : 0) +
+    (hasLink ? 10 : 0) +
+    (hasQuantifiedImpact ? 15 : 0) +
+    (completeEducation ? 10 : 0)
+
+  const score = Math.min(100, rawScore)
+  const suggestions = []
+
+  if (!hasStrongSummary) suggestions.push('Write a stronger summary (40-120 words).')
+  if (projectEntries.length < 2) suggestions.push('Add at least 2 projects.')
+  if (!hasQuantifiedImpact) suggestions.push('Add measurable impact (numbers) in bullets.')
+  if (skillItems.length < 8) suggestions.push('Add more skills (target 8+).')
+  if (!hasLink) suggestions.push('Add a GitHub or LinkedIn link.')
+  if (experienceEntries.length < 1) suggestions.push('Add at least 1 experience entry.')
+  if (!completeEducation) suggestions.push('Complete all education fields (school, degree, start, end).')
+
+  return {
+    score,
+    suggestions: suggestions.slice(0, 3),
+  }
 }
 
 function TopNav() {
@@ -97,49 +218,120 @@ function ListSection({ title, items, onAdd, renderItem }) {
 }
 
 function ResumeShell({ data, monochrome = false }) {
+  const educationEntries = data.education.filter(isEducationPopulated)
+  const experienceEntries = data.experience.filter(isExperiencePopulated)
+  const projectEntries = data.projects.filter(isProjectPopulated)
+  const skillItems = data.skills
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+  const showLinks = data.links.github.trim() || data.links.linkedin.trim()
+
+  const contactLine = [data.personal.email.trim(), data.personal.phone.trim(), data.personal.location.trim()]
+    .filter(Boolean)
+    .join(' | ')
+
   const containerClass = monochrome ? 'resume-shell monochrome' : 'resume-shell'
+
   return (
     <section className={containerClass}>
-      <h2 className="resume-name">{data.personal.name || 'Your Name'}</h2>
-      <p className="resume-meta">
-        {data.personal.email || 'email@example.com'} | {data.personal.phone || 'Phone'} | {data.personal.location || 'Location'}
-      </p>
+      <h2 className="resume-name">{data.personal.name.trim() || 'Your Name'}</h2>
+      {contactLine ? <p className="resume-meta">{contactLine}</p> : null}
 
-      <div className="resume-block">
-        <h3>Summary</h3>
-        <p>{data.summary || 'Professional summary appears here.'}</p>
-      </div>
+      {data.summary.trim() ? (
+        <div className="resume-block">
+          <h3>Summary</h3>
+          <p>{data.summary.trim()}</p>
+        </div>
+      ) : null}
 
-      <div className="resume-block">
-        <h3>Education</h3>
-        {data.education.map((item, idx) => (
-          <p key={idx}>{item.degree || 'Degree'} - {item.school || 'Institution'} ({item.start || 'Start'} - {item.end || 'End'})</p>
-        ))}
-      </div>
+      {educationEntries.length > 0 ? (
+        <div className="resume-block">
+          <h3>Education</h3>
+          {educationEntries.map((item, idx) => (
+            <p key={idx}>
+              {item.degree.trim()} {item.school.trim() ? `- ${item.school.trim()}` : ''}
+              {(item.start.trim() || item.end.trim()) ? ` (${item.start.trim()} - ${item.end.trim()})` : ''}
+            </p>
+          ))}
+        </div>
+      ) : null}
 
-      <div className="resume-block">
-        <h3>Experience</h3>
-        {data.experience.map((item, idx) => (
-          <p key={idx}>{item.role || 'Role'} - {item.company || 'Company'} ({item.start || 'Start'} - {item.end || 'End'})</p>
-        ))}
-      </div>
+      {experienceEntries.length > 0 ? (
+        <div className="resume-block">
+          <h3>Experience</h3>
+          {experienceEntries.map((item, idx) => (
+            <div key={idx} className="resume-subblock">
+              <p>
+                {item.role.trim()} {item.company.trim() ? `- ${item.company.trim()}` : ''}
+                {(item.start.trim() || item.end.trim()) ? ` (${item.start.trim()} - ${item.end.trim()})` : ''}
+              </p>
+              {item.details.trim() ? <p>{item.details.trim()}</p> : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
 
-      <div className="resume-block">
-        <h3>Projects</h3>
-        {data.projects.map((item, idx) => (
-          <p key={idx}>{item.name || 'Project'} | {item.tech || 'Tech Stack'}</p>
-        ))}
-      </div>
+      {projectEntries.length > 0 ? (
+        <div className="resume-block">
+          <h3>Projects</h3>
+          {projectEntries.map((item, idx) => (
+            <div key={idx} className="resume-subblock">
+              <p>
+                {item.name.trim()}
+                {item.tech.trim() ? ` | ${item.tech.trim()}` : ''}
+              </p>
+              {item.description.trim() ? <p>{item.description.trim()}</p> : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
 
-      <div className="resume-block">
-        <h3>Skills</h3>
-        <p>{data.skills || 'Skills list appears here.'}</p>
+      {skillItems.length > 0 ? (
+        <div className="resume-block">
+          <h3>Skills</h3>
+          <p>{skillItems.join(', ')}</p>
+        </div>
+      ) : null}
+
+      {showLinks ? (
+        <div className="resume-block">
+          <h3>Links</h3>
+          {data.links.github.trim() ? <p>GitHub: {data.links.github.trim()}</p> : null}
+          {data.links.linkedin.trim() ? <p>LinkedIn: {data.links.linkedin.trim()}</p> : null}
+        </div>
+      ) : null}
+    </section>
+  )
+}
+
+function ScoreCard({ score, suggestions }) {
+  return (
+    <section className="card score-card">
+      <div className="card-header">ATS Readiness Score</div>
+      <div className="card-body">
+        <div className="score-row">
+          <span className="score-value">{score}</span>
+          <span className="score-max">/100</span>
+        </div>
+        <div className="score-track" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={score}>
+          <div className="score-fill" style={{ width: `${score}%` }} />
+        </div>
+        {suggestions.length > 0 ? (
+          <ul className="suggestion-list">
+            {suggestions.map((text, index) => (
+              <li key={index}>{text}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="suggestion-clear">Core ATS checks passed for v1.</p>
+        )}
       </div>
     </section>
   )
 }
 
-function BuilderPage({ data, setData }) {
+function BuilderPage({ data, setData, scoreData }) {
   const updatePersonal = (key, value) => {
     setData((prev) => ({ ...prev, personal: { ...prev.personal, [key]: value } }))
   }
@@ -164,7 +356,7 @@ function BuilderPage({ data, setData }) {
       <TopNav />
       <section className="context-header">
         <h1 className="context-header__title">Resume Builder</h1>
-        <p className="context-header__subtitle">Structure first. Scoring and export will be added later.</p>
+        <p className="context-header__subtitle">Live autosave enabled. ATS scoring v1 updates while you edit.</p>
       </section>
       <main className="builder-grid">
         <section className="builder-left">
@@ -271,6 +463,7 @@ function BuilderPage({ data, setData }) {
         </section>
 
         <aside className="builder-right">
+          <ScoreCard score={scoreData.score} suggestions={scoreData.suggestions} />
           <div className="card preview-card">
             <div className="card-header">Live Preview</div>
             <div className="card-body">
@@ -309,15 +502,27 @@ function ProofPage() {
 }
 
 export default function App() {
-  const [resumeData, setResumeData] = useState(emptyResume)
-  const hasData = useMemo(() => resumeData.personal.name || resumeData.summary, [resumeData])
-  const previewData = hasData ? resumeData : emptyResume
+  const [resumeData, setResumeData] = useState(() => {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY)
+      if (!stored) return emptyResume
+      return normalizeResume(JSON.parse(stored))
+    } catch {
+      return emptyResume
+    }
+  })
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(resumeData))
+  }, [resumeData])
+
+  const scoreData = useMemo(() => calculateAtsV1(resumeData), [resumeData])
 
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
-      <Route path="/builder" element={<BuilderPage data={resumeData} setData={setResumeData} />} />
-      <Route path="/preview" element={<PreviewPage data={previewData} />} />
+      <Route path="/builder" element={<BuilderPage data={resumeData} setData={setResumeData} scoreData={scoreData} />} />
+      <Route path="/preview" element={<PreviewPage data={resumeData} />} />
       <Route path="/proof" element={<ProofPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
