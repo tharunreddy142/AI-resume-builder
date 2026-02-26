@@ -25,30 +25,126 @@
   background: var(--color-surface);
 }
 
-.template-tabs {
-  display: inline-flex;
-  border: 1px solid var(--color-border-dark);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
+.template-picker-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.template-tab {
-  border: none;
-  border-right: 1px solid var(--color-border-dark);
+.template-thumb-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.template-thumb {
+  width: 120px;
+  border: 1px solid var(--color-border-dark);
   background: #ffffff;
-  color: #111111;
-  font-size: var(--font-size-xs);
-  padding: 8px 14px;
+  border-radius: 8px;
+  padding: 8px;
+  position: relative;
   cursor: pointer;
 }
 
-.template-tab:last-child {
-  border-right: none;
+.template-thumb.active {
+  border: 2px solid #2563eb;
 }
 
-.template-tab.active {
-  background: #111111;
-  color: #ffffff;
+.template-check {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  color: #2563eb;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.template-thumb-label {
+  font-size: 12px;
+  margin-top: 8px;
+  text-align: left;
+}
+
+.template-sketch {
+  height: 72px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  padding: 6px;
+  display: flex;
+  gap: 4px;
+}
+
+.template-sketch span {
+  display: block;
+  border-radius: 2px;
+}
+
+.template-sketch-classic {
+  flex-direction: column;
+}
+
+.template-sketch-classic span:nth-child(1) {
+  height: 10px;
+  width: 65%;
+  background: #1f2937;
+}
+
+.template-sketch-classic span:nth-child(2),
+.template-sketch-classic span:nth-child(3) {
+  height: 8px;
+  width: 100%;
+  background: #9ca3af;
+}
+
+.template-sketch-modern {
+  display: grid;
+  grid-template-columns: 28% 72%;
+}
+
+.template-sketch-modern span:nth-child(1) {
+  background: #9ca3af;
+  grid-row: 1 / span 3;
+}
+
+.template-sketch-modern span:nth-child(2),
+.template-sketch-modern span:nth-child(3) {
+  background: #d1d5db;
+}
+
+.template-sketch-minimal {
+  flex-direction: column;
+}
+
+.template-sketch-minimal span:nth-child(1) {
+  height: 8px;
+  width: 55%;
+  background: #1f2937;
+}
+
+.template-sketch-minimal span:nth-child(2),
+.template-sketch-minimal span:nth-child(3) {
+  height: 7px;
+  width: 90%;
+  background: #cbd5e1;
+}
+
+.color-picker-row {
+  display: flex;
+  gap: 10px;
+}
+
+.color-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid #111111;
+  cursor: pointer;
+}
+
+.color-dot.active {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
 }
 
 .template-card .card-header {
@@ -299,11 +395,13 @@
 }
 
 .resume-shell {
+  --resume-accent: hsl(168, 60%, 40%);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: var(--spacing-md);
   background: var(--color-surface);
   min-height: 560px;
+  position: relative;
 }
 
 .resume-name {
@@ -329,7 +427,8 @@
   letter-spacing: 0.08em;
   margin-bottom: 6px;
   padding-bottom: 4px;
-  border-bottom: 1px solid var(--color-border-dark);
+  border-bottom: 1px solid var(--resume-accent);
+  color: var(--resume-accent);
 }
 
 .resume-block p {
@@ -409,10 +508,38 @@
   font-family: var(--font-sans);
   font-size: 30px;
   font-weight: var(--font-weight-bold);
+  color: #ffffff;
+}
+
+.resume-modern-layout {
+  display: grid;
+  grid-template-columns: 30% 70%;
+  min-height: 560px;
+}
+
+.resume-modern-sidebar {
+  background: var(--resume-accent);
+  color: #ffffff;
+  padding: var(--spacing-md);
+}
+
+.resume-modern-sidebar .resume-meta,
+.resume-modern-sidebar .resume-block p,
+.resume-modern-sidebar .skill-group-label {
+  color: #f5f5f5;
+}
+
+.resume-modern-sidebar .resume-block h3 {
+  color: #ffffff;
+  border-bottom-color: rgba(255, 255, 255, 0.75);
+}
+
+.resume-modern-main {
+  padding: var(--spacing-md);
 }
 
 .template-modern .resume-block {
-  border-left: 2px solid #111111;
+  border-left: 2px solid var(--resume-accent);
   padding-left: var(--spacing-sm);
 }
 
@@ -422,7 +549,9 @@
 }
 
 .template-minimal {
+  border: none;
   border-radius: 0;
+  padding: var(--spacing-lg);
 }
 
 .template-minimal .resume-name {
@@ -438,8 +567,13 @@
 
 .template-minimal .resume-block h3 {
   border-bottom: none;
-  margin-bottom: 4px;
+  color: var(--resume-accent);
+  margin-bottom: 10px;
   letter-spacing: 0.05em;
+}
+
+.template-minimal .resume-block {
+  margin-bottom: var(--spacing-md);
 }
 
 .preview-page {
@@ -464,7 +598,7 @@
 }
 
 .resume-shell.monochrome .resume-block h3 {
-  border-bottom-color: #111111;
+  border-bottom-color: var(--resume-accent);
 }
 
 .preview-template-card {

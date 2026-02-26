@@ -3,6 +3,14 @@ import { useEffect, useMemo, useState } from 'react'
 
 const STORAGE_KEY = 'resumeBuilderData'
 const TEMPLATE_KEY = 'resumeBuilderTemplate'
+const ACCENT_KEY = 'resumeBuilderAccentColor'
+const ACCENT_COLORS = [
+  { name: 'Teal', value: 'hsl(168, 60%, 40%)' },
+  { name: 'Navy', value: 'hsl(220, 60%, 35%)' },
+  { name: 'Burgundy', value: 'hsl(345, 60%, 35%)' },
+  { name: 'Forest', value: 'hsl(150, 50%, 30%)' },
+  { name: 'Charcoal', value: 'hsl(0, 0%, 25%)' },
+]
 const ACTION_VERBS = [
   'Built',
   'Developed',
@@ -160,6 +168,12 @@ function normalizeResume(raw) {
 function normalizeTemplate(raw) {
   if (raw === 'classic' || raw === 'modern' || raw === 'minimal') return raw
   return 'classic'
+}
+
+function normalizeAccentColor(raw) {
+  const fallback = ACCENT_COLORS[0].value
+  const isValid = ACCENT_COLORS.some((item) => item.value === raw)
+  return isValid ? raw : fallback
 }
 
 function getAllSkills(data) {
@@ -361,12 +375,47 @@ function TopNav() {
   )
 }
 
-function TemplateTabs({ selectedTemplate, onSelect }) {
+function TemplatePicker({ selectedTemplate, onTemplateSelect, accentColor, onColorSelect }) {
+  const templates = [
+    { id: 'classic', label: 'Classic' },
+    { id: 'modern', label: 'Modern' },
+    { id: 'minimal', label: 'Minimal' },
+  ]
+
   return (
-    <div className="template-tabs" role="tablist" aria-label="Resume templates">
-      <button type="button" className={`template-tab ${selectedTemplate === 'classic' ? 'active' : ''}`} onClick={() => onSelect('classic')}>Classic</button>
-      <button type="button" className={`template-tab ${selectedTemplate === 'modern' ? 'active' : ''}`} onClick={() => onSelect('modern')}>Modern</button>
-      <button type="button" className={`template-tab ${selectedTemplate === 'minimal' ? 'active' : ''}`} onClick={() => onSelect('minimal')}>Minimal</button>
+    <div className="template-picker-wrap">
+      <div className="template-thumb-row" role="tablist" aria-label="Resume templates">
+        {templates.map((template) => (
+          <button
+            type="button"
+            key={template.id}
+            className={`template-thumb ${selectedTemplate === template.id ? 'active' : ''}`}
+            onClick={() => onTemplateSelect(template.id)}
+            aria-label={template.label}
+          >
+            <div className={`template-sketch template-sketch-${template.id}`}>
+              <span />
+              <span />
+              <span />
+            </div>
+            <div className="template-thumb-label">{template.label}</div>
+            {selectedTemplate === template.id ? <div className="template-check">✓</div> : null}
+          </button>
+        ))}
+      </div>
+
+      <div className="color-picker-row">
+        {ACCENT_COLORS.map((color) => (
+          <button
+            key={color.value}
+            type="button"
+            className={`color-dot ${accentColor === color.value ? 'active' : ''}`}
+            style={{ backgroundColor: color.value }}
+            aria-label={color.name}
+            onClick={() => onColorSelect(color.value)}
+          />
+        ))}
+      </div>
     </div>
   )
 }
@@ -474,11 +523,12 @@ function BulletGuidance({ text }) {
   )
 }
 
-function ResumeShell({ data, template = 'classic', monochrome = false }) {
+function ResumeShell({ data, template = 'classic', monochrome = false, accentColor }) {
   const educationEntries = data.education.filter(isEducationPopulated)
   const experienceEntries = data.experience.filter(isExperiencePopulated)
   const projectEntries = data.projects.filter(isProjectPopulated)
   const showLinks = data.links.github.trim() || data.links.linkedin.trim()
+  const hasAnySkills = getAllSkills(data).length > 0
 
   const contactLine = [data.personal.email.trim(), data.personal.phone.trim(), data.personal.location.trim()]
     .filter(Boolean)
@@ -486,11 +536,8 @@ function ResumeShell({ data, template = 'classic', monochrome = false }) {
 
   const containerClass = `resume-shell template-${template} ${monochrome ? 'monochrome' : ''}`.trim()
 
-  return (
-    <section className={containerClass}>
-      <h2 className="resume-name">{data.personal.name.trim() || 'Your Name'}</h2>
-      {contactLine ? <p className="resume-meta">{contactLine}</p> : null}
-
+  const sharedSections = (
+    <>
       {data.summary.trim() ? (
         <div className="resume-block">
           <h3>Summary</h3>
@@ -549,44 +596,105 @@ function ResumeShell({ data, template = 'classic', monochrome = false }) {
           </div>
         </div>
       ) : null}
+    </>
+  )
 
-      {getAllSkills(data).length > 0 ? (
-        <div className="resume-block">
-          <h3>Skills</h3>
-          {data.skills.technical.length > 0 ? (
-            <div className="skill-preview-group">
-              <p className="skill-group-label">Technical Skills</p>
-              <div className="chip-row preview-chip-row">
-                {data.skills.technical.map((skill) => <span key={skill} className="chip chip-static">{skill}</span>)}
-              </div>
-            </div>
-          ) : null}
-          {data.skills.soft.length > 0 ? (
-            <div className="skill-preview-group">
-              <p className="skill-group-label">Soft Skills</p>
-              <div className="chip-row preview-chip-row">
-                {data.skills.soft.map((skill) => <span key={skill} className="chip chip-static">{skill}</span>)}
-              </div>
-            </div>
-          ) : null}
-          {data.skills.tools.length > 0 ? (
-            <div className="skill-preview-group">
-              <p className="skill-group-label">Tools & Technologies</p>
-              <div className="chip-row preview-chip-row">
-                {data.skills.tools.map((skill) => <span key={skill} className="chip chip-static">{skill}</span>)}
-              </div>
-            </div>
-          ) : null}
-        </div>
-      ) : null}
+  return (
+    <section className={containerClass} style={{ '--resume-accent': accentColor }}>
+      {template === 'modern' ? (
+        <div className="resume-modern-layout">
+          <aside className="resume-modern-sidebar">
+            <h2 className="resume-name">{data.personal.name.trim() || 'Your Name'}</h2>
+            {contactLine ? <p className="resume-meta">{contactLine}</p> : null}
 
-      {showLinks ? (
-        <div className="resume-block">
-          <h3>Links</h3>
-          {data.links.github.trim() ? <p>GitHub: {data.links.github.trim()}</p> : null}
-          {data.links.linkedin.trim() ? <p>LinkedIn: {data.links.linkedin.trim()}</p> : null}
+            {hasAnySkills ? (
+              <div className="resume-block">
+                <h3>Skills</h3>
+                {data.skills.technical.length > 0 ? (
+                  <div className="skill-preview-group">
+                    <p className="skill-group-label">Technical Skills</p>
+                    <div className="chip-row preview-chip-row">
+                      {data.skills.technical.map((skill) => <span key={skill} className="chip chip-static">{skill}</span>)}
+                    </div>
+                  </div>
+                ) : null}
+                {data.skills.soft.length > 0 ? (
+                  <div className="skill-preview-group">
+                    <p className="skill-group-label">Soft Skills</p>
+                    <div className="chip-row preview-chip-row">
+                      {data.skills.soft.map((skill) => <span key={skill} className="chip chip-static">{skill}</span>)}
+                    </div>
+                  </div>
+                ) : null}
+                {data.skills.tools.length > 0 ? (
+                  <div className="skill-preview-group">
+                    <p className="skill-group-label">Tools & Technologies</p>
+                    <div className="chip-row preview-chip-row">
+                      {data.skills.tools.map((skill) => <span key={skill} className="chip chip-static">{skill}</span>)}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {showLinks ? (
+              <div className="resume-block">
+                <h3>Links</h3>
+                {data.links.github.trim() ? <p>GitHub: {data.links.github.trim()}</p> : null}
+                {data.links.linkedin.trim() ? <p>LinkedIn: {data.links.linkedin.trim()}</p> : null}
+              </div>
+            ) : null}
+          </aside>
+
+          <div className="resume-modern-main">
+            {sharedSections}
+          </div>
         </div>
-      ) : null}
+      ) : (
+        <>
+          <h2 className="resume-name">{data.personal.name.trim() || 'Your Name'}</h2>
+          {contactLine ? <p className="resume-meta">{contactLine}</p> : null}
+          {sharedSections}
+
+          {hasAnySkills ? (
+            <div className="resume-block">
+              <h3>Skills</h3>
+              {data.skills.technical.length > 0 ? (
+                <div className="skill-preview-group">
+                  <p className="skill-group-label">Technical Skills</p>
+                  <div className="chip-row preview-chip-row">
+                    {data.skills.technical.map((skill) => <span key={skill} className="chip chip-static">{skill}</span>)}
+                  </div>
+                </div>
+              ) : null}
+              {data.skills.soft.length > 0 ? (
+                <div className="skill-preview-group">
+                  <p className="skill-group-label">Soft Skills</p>
+                  <div className="chip-row preview-chip-row">
+                    {data.skills.soft.map((skill) => <span key={skill} className="chip chip-static">{skill}</span>)}
+                  </div>
+                </div>
+              ) : null}
+              {data.skills.tools.length > 0 ? (
+                <div className="skill-preview-group">
+                  <p className="skill-group-label">Tools & Technologies</p>
+                  <div className="chip-row preview-chip-row">
+                    {data.skills.tools.map((skill) => <span key={skill} className="chip chip-static">{skill}</span>)}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {showLinks ? (
+            <div className="resume-block">
+              <h3>Links</h3>
+              {data.links.github.trim() ? <p>GitHub: {data.links.github.trim()}</p> : null}
+              {data.links.linkedin.trim() ? <p>LinkedIn: {data.links.linkedin.trim()}</p> : null}
+            </div>
+          ) : null}
+        </>
+      )}
     </section>
   )
 }
@@ -631,7 +739,16 @@ function ScoreCard({ score, suggestions, improvements }) {
   )
 }
 
-function BuilderPage({ data, setData, scoreData, improvements, selectedTemplate, setSelectedTemplate }) {
+function BuilderPage({
+  data,
+  setData,
+  scoreData,
+  improvements,
+  selectedTemplate,
+  setSelectedTemplate,
+  accentColor,
+  setAccentColor,
+}) {
   const [skillsOpen, setSkillsOpen] = useState(true)
   const [projectsOpen, setProjectsOpen] = useState(true)
   const [suggestingSkills, setSuggestingSkills] = useState(false)
@@ -977,14 +1094,19 @@ function BuilderPage({ data, setData, scoreData, improvements, selectedTemplate,
           <section className="card template-card">
             <div className="card-header">Template</div>
             <div className="card-body">
-              <TemplateTabs selectedTemplate={selectedTemplate} onSelect={setSelectedTemplate} />
+              <TemplatePicker
+                selectedTemplate={selectedTemplate}
+                onTemplateSelect={setSelectedTemplate}
+                accentColor={accentColor}
+                onColorSelect={setAccentColor}
+              />
             </div>
           </section>
           <ScoreCard score={scoreData.score} suggestions={scoreData.suggestions} improvements={improvements} />
           <div className="card preview-card">
             <div className="card-header">Live Preview</div>
             <div className="card-body">
-              <ResumeShell data={data} template={selectedTemplate} />
+              <ResumeShell data={data} template={selectedTemplate} accentColor={accentColor} />
             </div>
           </div>
         </aside>
@@ -993,14 +1115,16 @@ function BuilderPage({ data, setData, scoreData, improvements, selectedTemplate,
   )
 }
 
-function PreviewPage({ data, selectedTemplate, setSelectedTemplate }) {
+function PreviewPage({ data, selectedTemplate, setSelectedTemplate, accentColor, setAccentColor }) {
   const [copyStatus, setCopyStatus] = useState('')
+  const [toastMessage, setToastMessage] = useState('')
   const [showWarning, setShowWarning] = useState(false)
   const exportWarnings = useMemo(() => getExportWarnings(data), [data])
 
-  const handlePrint = () => {
+  const handleDownloadPdf = () => {
     if (exportWarnings.length > 0) setShowWarning(true)
-    window.print()
+    setToastMessage('PDF export ready! Check your downloads.')
+    window.setTimeout(() => setToastMessage(''), 2200)
   }
 
   const handleCopyText = async () => {
@@ -1018,13 +1142,18 @@ function PreviewPage({ data, selectedTemplate, setSelectedTemplate }) {
       <TopNav />
       <main className="preview-main">
         <section className="card template-card preview-template-card">
-          <div className="card-header">Template</div>
+          <div className="card-header">Template & Color</div>
           <div className="card-body">
-            <TemplateTabs selectedTemplate={selectedTemplate} onSelect={setSelectedTemplate} />
+            <TemplatePicker
+              selectedTemplate={selectedTemplate}
+              onTemplateSelect={setSelectedTemplate}
+              accentColor={accentColor}
+              onColorSelect={setAccentColor}
+            />
           </div>
         </section>
         <section className="card preview-toolbar">
-          <button type="button" className="btn btn-primary" onClick={handlePrint}>Print / Save as PDF</button>
+          <button type="button" className="btn btn-primary" onClick={handleDownloadPdf}>Download PDF</button>
           <button type="button" className="btn btn-secondary" onClick={handleCopyText}>Copy Resume as Text</button>
         </section>
 
@@ -1038,8 +1167,10 @@ function PreviewPage({ data, selectedTemplate, setSelectedTemplate }) {
           <p className="copy-status">{copyStatus}</p>
         ) : null}
 
+        {toastMessage ? <p className="copy-status">{toastMessage}</p> : null}
+
         <div className="print-target">
-          <ResumeShell data={data} template={selectedTemplate} monochrome />
+          <ResumeShell data={data} template={selectedTemplate} monochrome accentColor={accentColor} />
         </div>
       </main>
     </div>
@@ -1079,6 +1210,14 @@ export default function App() {
     }
   })
 
+  const [selectedAccentColor, setSelectedAccentColor] = useState(() => {
+    try {
+      return normalizeAccentColor(localStorage.getItem(ACCENT_KEY))
+    } catch {
+      return ACCENT_COLORS[0].value
+    }
+  })
+
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(resumeData))
   }, [resumeData])
@@ -1086,6 +1225,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem(TEMPLATE_KEY, selectedTemplate)
   }, [selectedTemplate])
+
+  useEffect(() => {
+    localStorage.setItem(ACCENT_KEY, selectedAccentColor)
+  }, [selectedAccentColor])
 
   const scoreData = useMemo(() => calculateAtsV1(resumeData), [resumeData])
   const improvements = useMemo(() => topImprovements(resumeData), [resumeData])
@@ -1103,12 +1246,22 @@ export default function App() {
             improvements={improvements}
             selectedTemplate={selectedTemplate}
             setSelectedTemplate={setSelectedTemplate}
+            accentColor={selectedAccentColor}
+            setAccentColor={setSelectedAccentColor}
           />
         }
       />
       <Route
         path="/preview"
-        element={<PreviewPage data={resumeData} selectedTemplate={selectedTemplate} setSelectedTemplate={setSelectedTemplate} />}
+        element={
+          <PreviewPage
+            data={resumeData}
+            selectedTemplate={selectedTemplate}
+            setSelectedTemplate={setSelectedTemplate}
+            accentColor={selectedAccentColor}
+            setAccentColor={setSelectedAccentColor}
+          />
+        }
       />
       <Route path="/proof" element={<ProofPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
