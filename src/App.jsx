@@ -5,6 +5,13 @@ const STORAGE_KEY = 'resumeBuilderData'
 const TEMPLATE_KEY = 'resumeBuilderTemplate'
 const ACCENT_KEY = 'resumeBuilderAccentColor'
 const APP_STATE_KEY = 'resumeBuilderAppState'
+const READINESS_WEIGHTS = {
+  jobMatchQuality: 30,
+  jdSkillAlignment: 25,
+  resumeAtsScore: 25,
+  applicationProgress: 10,
+  practiceCompletion: 10,
+}
 const ACCENT_COLORS = [
   { name: 'Teal', value: 'hsl(168, 60%, 40%)' },
   { name: 'Navy', value: 'hsl(220, 60%, 35%)' },
@@ -302,6 +309,54 @@ function calculateResumeScore(data) {
   }
 
   return { score, suggestions, statusLabel, statusTone }
+}
+
+function clampScore(value) {
+  const num = Number(value)
+  if (Number.isNaN(num)) return 0
+  return Math.max(0, Math.min(100, num))
+}
+
+function calculateReadinessScore({ jobMatches, jdAnalyses, resumeAtsScore, applications, practiceCompletion }) {
+  const jobMatchValues = (jobMatches || [])
+    .map((item) => clampScore(item?.qualityScore ?? item?.matchQuality ?? item?.score))
+  const jobMatchQuality = jobMatchValues.length
+    ? jobMatchValues.reduce((acc, value) => acc + value, 0) / jobMatchValues.length
+    : 0
+
+  const jdValues = (jdAnalyses || [])
+    .map((item) => clampScore(item?.skillAlignmentScore ?? item?.alignmentScore ?? item?.score))
+  const jdSkillAlignment = jdValues.length
+    ? jdValues.reduce((acc, value) => acc + value, 0) / jdValues.length
+    : 0
+
+  const totalApplications = (applications || []).length
+  const completedApplications = (applications || []).filter((item) =>
+    ['submitted', 'interview', 'offer', 'rejected', 'completed'].includes((item?.status || '').toLowerCase()),
+  ).length
+  const applicationProgress = totalApplications > 0 ? (completedApplications / totalApplications) * 100 : 0
+
+  const components = {
+    jobMatchQuality: clampScore(jobMatchQuality),
+    jdSkillAlignment: clampScore(jdSkillAlignment),
+    resumeAtsScore: clampScore(resumeAtsScore),
+    applicationProgress: clampScore(applicationProgress),
+    practiceCompletion: clampScore(practiceCompletion),
+  }
+
+  const score = Math.round(
+    (components.jobMatchQuality * READINESS_WEIGHTS.jobMatchQuality +
+      components.jdSkillAlignment * READINESS_WEIGHTS.jdSkillAlignment +
+      components.resumeAtsScore * READINESS_WEIGHTS.resumeAtsScore +
+      components.applicationProgress * READINESS_WEIGHTS.applicationProgress +
+      components.practiceCompletion * READINESS_WEIGHTS.practiceCompletion) / 100,
+  )
+
+  return {
+    score,
+    weights: READINESS_WEIGHTS,
+    components,
+  }
 }
 
 function getExportWarnings(data) {
@@ -1265,14 +1320,19 @@ function ProofPage() {
 }
 
 export default function App() {
+  const initialAppState = useMemo(() => {
+    try {
+      const raw = localStorage.getItem(APP_STATE_KEY)
+      return raw ? JSON.parse(raw) : null
+    } catch {
+      return null
+    }
+  }, [])
+
   const [resumeData, setResumeData] = useState(() => {
     try {
-      const appStateRaw = localStorage.getItem(APP_STATE_KEY)
-      if (appStateRaw) {
-        const appState = JSON.parse(appStateRaw)
-        if (appState && typeof appState === 'object' && appState.resumeData) {
-          return normalizeResume(appState.resumeData)
-        }
+      if (initialAppState && typeof initialAppState === 'object' && initialAppState.resumeData) {
+        return normalizeResume(initialAppState.resumeData)
       }
       const stored = localStorage.getItem(STORAGE_KEY)
       if (!stored) return emptyResume
@@ -1284,12 +1344,8 @@ export default function App() {
 
   const [selectedTemplate, setSelectedTemplate] = useState(() => {
     try {
-      const appStateRaw = localStorage.getItem(APP_STATE_KEY)
-      if (appStateRaw) {
-        const appState = JSON.parse(appStateRaw)
-        if (appState && typeof appState === 'object' && appState.preferences?.template) {
-          return normalizeTemplate(appState.preferences.template)
-        }
+      if (initialAppState && typeof initialAppState === 'object' && initialAppState.preferences?.template) {
+        return normalizeTemplate(initialAppState.preferences.template)
       }
       return normalizeTemplate(localStorage.getItem(TEMPLATE_KEY) || 'classic')
     } catch {
@@ -1299,12 +1355,8 @@ export default function App() {
 
   const [selectedAccentColor, setSelectedAccentColor] = useState(() => {
     try {
-      const appStateRaw = localStorage.getItem(APP_STATE_KEY)
-      if (appStateRaw) {
-        const appState = JSON.parse(appStateRaw)
-        if (appState && typeof appState === 'object' && appState.preferences?.accentColor) {
-          return normalizeAccentColor(appState.preferences.accentColor)
-        }
+      if (initialAppState && typeof initialAppState === 'object' && initialAppState.preferences?.accentColor) {
+        return normalizeAccentColor(initialAppState.preferences.accentColor)
       }
       return normalizeAccentColor(localStorage.getItem(ACCENT_KEY))
     } catch {
@@ -1312,7 +1364,31 @@ export default function App() {
     }
   })
 
+  const [jobMatches] = useState(() =>
+    Array.isArray(initialAppState?.jobMatches) ? initialAppState.jobMatches : [],
+  )
+  const [applications] = useState(() =>
+    Array.isArray(initialAppState?.applications) ? initialAppState.applications : [],
+  )
+  const [jdAnalyses] = useState(() =>
+    Array.isArray(initialAppState?.jdAnalyses) ? initialAppState.jdAnalyses : [],
+  )
+  const [practiceCompletion] = useState(() =>
+    clampScore(initialAppState?.practiceCompletion ?? 0),
+  )
+
   const scoreData = useMemo(() => calculateResumeScore(resumeData), [resumeData])
+  const readinessData = useMemo(
+    () =>
+      calculateReadinessScore({
+        jobMatches,
+        jdAnalyses,
+        resumeAtsScore: scoreData.score,
+        applications,
+        practiceCompletion,
+      }),
+    [jobMatches, jdAnalyses, scoreData.score, applications, practiceCompletion],
+  )
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(resumeData))
@@ -1333,14 +1409,24 @@ export default function App() {
         accentColor: selectedAccentColor,
       },
       resumeData,
-      jobMatches: [],
-      applications: [],
-      jdAnalyses: [],
-      readinessScore: scoreData.score,
+      jobMatches,
+      applications,
+      jdAnalyses,
+      readinessScore: readinessData,
+      practiceCompletion,
       lastActivity: new Date().toISOString(),
     }
     localStorage.setItem(APP_STATE_KEY, JSON.stringify(appState))
-  }, [resumeData, selectedTemplate, selectedAccentColor, scoreData.score])
+  }, [
+    resumeData,
+    selectedTemplate,
+    selectedAccentColor,
+    jobMatches,
+    applications,
+    jdAnalyses,
+    readinessData,
+    practiceCompletion,
+  ])
 
   return (
     <Routes>
