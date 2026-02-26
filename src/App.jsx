@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 const STORAGE_KEY = 'resumeBuilderData'
 const TEMPLATE_KEY = 'resumeBuilderTemplate'
 const ACCENT_KEY = 'resumeBuilderAccentColor'
+const APP_STATE_KEY = 'resumeBuilderAppState'
 const ACCENT_COLORS = [
   { name: 'Teal', value: 'hsl(168, 60%, 40%)' },
   { name: 'Navy', value: 'hsl(220, 60%, 35%)' },
@@ -1176,13 +1177,32 @@ function PreviewPage({ data, scoreData, selectedTemplate, setSelectedTemplate, a
     if (exportWarnings.length > 0) setShowWarning(true)
     setToastMessage('PDF export ready! Check your downloads.')
     window.setTimeout(() => setToastMessage(''), 2200)
+    window.print()
+  }
+
+  const copyWithFallback = async (text) => {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text)
+      return true
+    }
+
+    const area = document.createElement('textarea')
+    area.value = text
+    area.setAttribute('readonly', '')
+    area.style.position = 'fixed'
+    area.style.opacity = '0'
+    document.body.appendChild(area)
+    area.select()
+    const success = document.execCommand('copy')
+    document.body.removeChild(area)
+    return success
   }
 
   const handleCopyText = async () => {
     if (exportWarnings.length > 0) setShowWarning(true)
     try {
-      await navigator.clipboard.writeText(buildResumePlainText(data))
-      setCopyStatus('Resume text copied.')
+      const success = await copyWithFallback(buildResumePlainText(data))
+      setCopyStatus(success ? 'Resume text copied.' : 'Could not copy resume text.')
     } catch {
       setCopyStatus('Could not copy resume text.')
     }
@@ -1247,6 +1267,13 @@ function ProofPage() {
 export default function App() {
   const [resumeData, setResumeData] = useState(() => {
     try {
+      const appStateRaw = localStorage.getItem(APP_STATE_KEY)
+      if (appStateRaw) {
+        const appState = JSON.parse(appStateRaw)
+        if (appState && typeof appState === 'object' && appState.resumeData) {
+          return normalizeResume(appState.resumeData)
+        }
+      }
       const stored = localStorage.getItem(STORAGE_KEY)
       if (!stored) return emptyResume
       return normalizeResume(JSON.parse(stored))
@@ -1257,6 +1284,13 @@ export default function App() {
 
   const [selectedTemplate, setSelectedTemplate] = useState(() => {
     try {
+      const appStateRaw = localStorage.getItem(APP_STATE_KEY)
+      if (appStateRaw) {
+        const appState = JSON.parse(appStateRaw)
+        if (appState && typeof appState === 'object' && appState.preferences?.template) {
+          return normalizeTemplate(appState.preferences.template)
+        }
+      }
       return normalizeTemplate(localStorage.getItem(TEMPLATE_KEY) || 'classic')
     } catch {
       return 'classic'
@@ -1265,11 +1299,20 @@ export default function App() {
 
   const [selectedAccentColor, setSelectedAccentColor] = useState(() => {
     try {
+      const appStateRaw = localStorage.getItem(APP_STATE_KEY)
+      if (appStateRaw) {
+        const appState = JSON.parse(appStateRaw)
+        if (appState && typeof appState === 'object' && appState.preferences?.accentColor) {
+          return normalizeAccentColor(appState.preferences.accentColor)
+        }
+      }
       return normalizeAccentColor(localStorage.getItem(ACCENT_KEY))
     } catch {
       return ACCENT_COLORS[0].value
     }
   })
+
+  const scoreData = useMemo(() => calculateResumeScore(resumeData), [resumeData])
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(resumeData))
@@ -1283,7 +1326,21 @@ export default function App() {
     localStorage.setItem(ACCENT_KEY, selectedAccentColor)
   }, [selectedAccentColor])
 
-  const scoreData = useMemo(() => calculateResumeScore(resumeData), [resumeData])
+  useEffect(() => {
+    const appState = {
+      preferences: {
+        template: selectedTemplate,
+        accentColor: selectedAccentColor,
+      },
+      resumeData,
+      jobMatches: [],
+      applications: [],
+      jdAnalyses: [],
+      readinessScore: scoreData.score,
+      lastActivity: new Date().toISOString(),
+    }
+    localStorage.setItem(APP_STATE_KEY, JSON.stringify(appState))
+  }, [resumeData, selectedTemplate, selectedAccentColor, scoreData.score])
 
   return (
     <Routes>
