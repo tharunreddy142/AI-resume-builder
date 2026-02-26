@@ -381,8 +381,12 @@ function TopNav() {
     <header className="topbar app-nav">
       <div className="topbar__left">AI Resume Builder</div>
       <nav className="topbar__right nav-links">
-        <Link to="/builder" className="nav-link">Builder</Link>
-        <Link to="/preview" className="nav-link">Preview</Link>
+        <Link to="/jobs" className="nav-link">Jobs</Link>
+        <Link to="/analyze" className="nav-link">Analyze</Link>
+        <Link to="/resume" className="nav-link">Resume</Link>
+        <Link to="/applications" className="nav-link">Applications</Link>
+        <Link to="/dashboard" className="nav-link">Dashboard</Link>
+        <Link to="/settings" className="nav-link">Settings</Link>
         <Link to="/proof" className="nav-link">Proof</Link>
       </nav>
     </header>
@@ -440,7 +444,21 @@ function HomePage() {
       <TopNav />
       <main className="home-main">
         <h1 className="home-headline">Build a Resume That Gets Read.</h1>
-        <Link className="btn btn-primary btn-lg" to="/builder">Start Building</Link>
+        <Link className="btn btn-primary btn-lg" to="/resume">Start Building</Link>
+      </main>
+    </div>
+  )
+}
+
+function PlaceholderPage({ title }) {
+  return (
+    <div className="page-wrapper">
+      <TopNav />
+      <main className="proof-main-container">
+        <section className="card proof-card">
+          <h1 className="card-header">{title}</h1>
+          <p className="card-body">Page scaffold ready.</p>
+        </section>
       </main>
     </div>
   )
@@ -1270,8 +1288,12 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
+      <Route path="/jobs" element={<PlaceholderPage title="Jobs" />} />
+      <Route path="/applications" element={<PlaceholderPage title="Applications" />} />
+      <Route path="/dashboard" element={<PlaceholderPage title="Dashboard" />} />
+      <Route path="/settings" element={<PlaceholderPage title="Settings" />} />
       <Route
-        path="/builder"
+        path="/resume"
         element={
           <BuilderPage
             data={resumeData}
@@ -1285,7 +1307,7 @@ export default function App() {
         }
       />
       <Route
-        path="/preview"
+        path="/analyze"
         element={
           <PreviewPage
             data={resumeData}
@@ -1298,6 +1320,8 @@ export default function App() {
         }
       />
       <Route path="/proof" element={<ProofPage />} />
+      <Route path="/builder" element={<Navigate to="/resume" replace />} />
+      <Route path="/preview" element={<Navigate to="/analyze" replace />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
