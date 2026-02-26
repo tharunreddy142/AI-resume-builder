@@ -2,6 +2,18 @@ import { Link, Navigate, Route, Routes } from 'react-router-dom'
 import { useEffect, useMemo, useState } from 'react'
 
 const STORAGE_KEY = 'resumeBuilderData'
+const TEMPLATE_KEY = 'resumeBuilderTemplate'
+const ACTION_VERBS = [
+  'Built',
+  'Developed',
+  'Designed',
+  'Implemented',
+  'Led',
+  'Improved',
+  'Created',
+  'Optimized',
+  'Automated',
+]
 
 const emptyResume = {
   personal: { name: '', email: '', phone: '', location: '' },
@@ -29,19 +41,19 @@ const sampleResume = {
       role: 'Software Engineer',
       start: '2023',
       end: 'Present',
-      details: 'Improved conversion by 22% using A/B experiments. Reduced page load time by 1.4s.',
+      details: 'Improved conversion by 22% using A/B experiments.\nBuilt internal automation that reduced processing time by 2x.',
     },
   ],
   projects: [
     {
       name: 'TaskFlow',
       tech: 'React, Node.js',
-      description: 'Collaborative tracker used by 2k+ users with weekly reports.',
+      description: 'Built collaborative tracker used by 2k+ users with weekly reports.',
     },
     {
       name: 'Resume Lens',
       tech: 'TypeScript, PostgreSQL',
-      description: 'Generated keyword insights and improved relevance score by 18%.',
+      description: 'Optimized keyword insights and improved relevance score by 18%.',
     },
   ],
   skills: 'React, JavaScript, TypeScript, Node.js, SQL, REST APIs, Git, Testing',
@@ -97,6 +109,11 @@ function normalizeResume(raw) {
   }
 }
 
+function normalizeTemplate(raw) {
+  if (raw === 'classic' || raw === 'modern' || raw === 'minimal') return raw
+  return 'classic'
+}
+
 function isEducationPopulated(item) {
   return Boolean(item.school.trim() || item.degree.trim() || item.start.trim() || item.end.trim())
 }
@@ -113,6 +130,29 @@ function isProjectPopulated(item) {
 
 function hasNumber(text) {
   return /\d+\s*(%|x|k|m)?/i.test(text)
+}
+
+function extractBullets(text) {
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => line.replace(/^[\-•*\d.)\s]+/, '').trim())
+    .filter(Boolean)
+}
+
+function startsWithActionVerb(text) {
+  const regex = new RegExp(`^(${ACTION_VERBS.join('|')})\\b`, 'i')
+  return regex.test(text)
+}
+
+function evaluateBullets(text) {
+  return extractBullets(text).map((line, index) => ({
+    index,
+    text: line,
+    hasVerb: startsWithActionVerb(line),
+    hasNumber: hasNumber(line),
+  }))
 }
 
 function calculateAtsV1(data) {
@@ -165,6 +205,28 @@ function calculateAtsV1(data) {
   }
 }
 
+function topImprovements(data) {
+  const summaryWords = data.summary.trim().split(/\s+/).filter(Boolean).length
+  const projectEntries = data.projects.filter(isProjectPopulated)
+  const experienceEntries = data.experience.filter(isExperiencePopulated)
+  const skillItems = data.skills
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean)
+  const hasQuantifiedImpact =
+    [...experienceEntries.map((item) => item.details), ...projectEntries.map((item) => item.description)]
+      .some((text) => hasNumber(text || ''))
+
+  const items = []
+  if (projectEntries.length < 2) items.push('Add at least 2 projects to strengthen technical depth.')
+  if (!hasQuantifiedImpact) items.push('Add measurable impact (numbers) in experience or project bullets.')
+  if (summaryWords < 40) items.push('Expand your summary to at least 40 words.')
+  if (skillItems.length < 8) items.push('Expand your skills list to 8+ relevant skills.')
+  if (experienceEntries.length < 1) items.push('Add experience, internship, or project work with outcomes.')
+
+  return items.slice(0, 3)
+}
+
 function TopNav() {
   return (
     <header className="topbar app-nav">
@@ -175,6 +237,16 @@ function TopNav() {
         <Link to="/proof" className="nav-link">Proof</Link>
       </nav>
     </header>
+  )
+}
+
+function TemplateTabs({ selectedTemplate, onSelect }) {
+  return (
+    <div className="template-tabs" role="tablist" aria-label="Resume templates">
+      <button type="button" className={`template-tab ${selectedTemplate === 'classic' ? 'active' : ''}`} onClick={() => onSelect('classic')}>Classic</button>
+      <button type="button" className={`template-tab ${selectedTemplate === 'modern' ? 'active' : ''}`} onClick={() => onSelect('modern')}>Modern</button>
+      <button type="button" className={`template-tab ${selectedTemplate === 'minimal' ? 'active' : ''}`} onClick={() => onSelect('minimal')}>Minimal</button>
+    </div>
   )
 }
 
@@ -217,7 +289,26 @@ function ListSection({ title, items, onAdd, renderItem }) {
   )
 }
 
-function ResumeShell({ data, monochrome = false }) {
+function BulletGuidance({ text }) {
+  const checks = evaluateBullets(text)
+  const issues = checks.filter((item) => !item.hasVerb || !item.hasNumber)
+
+  if (issues.length === 0) return null
+
+  return (
+    <div className="bullet-guidance" aria-live="polite">
+      {issues.map((item) => (
+        <p key={`${item.index}-${item.text}`} className="bullet-hint">
+          Bullet {item.index + 1}:
+          {!item.hasVerb ? ' Start with a strong action verb.' : ''}
+          {!item.hasNumber ? ' Add measurable impact (numbers).' : ''}
+        </p>
+      ))}
+    </div>
+  )
+}
+
+function ResumeShell({ data, template = 'classic', monochrome = false }) {
   const educationEntries = data.education.filter(isEducationPopulated)
   const experienceEntries = data.experience.filter(isExperiencePopulated)
   const projectEntries = data.projects.filter(isProjectPopulated)
@@ -231,7 +322,7 @@ function ResumeShell({ data, monochrome = false }) {
     .filter(Boolean)
     .join(' | ')
 
-  const containerClass = monochrome ? 'resume-shell monochrome' : 'resume-shell'
+  const containerClass = `resume-shell template-${template} ${monochrome ? 'monochrome' : ''}`.trim()
 
   return (
     <section className={containerClass}>
@@ -266,7 +357,9 @@ function ResumeShell({ data, monochrome = false }) {
                 {item.role.trim()} {item.company.trim() ? `- ${item.company.trim()}` : ''}
                 {(item.start.trim() || item.end.trim()) ? ` (${item.start.trim()} - ${item.end.trim()})` : ''}
               </p>
-              {item.details.trim() ? <p>{item.details.trim()}</p> : null}
+              {extractBullets(item.details).map((bullet, bulletIndex) => (
+                <p key={bulletIndex} className="resume-bullet">- {bullet}</p>
+              ))}
             </div>
           ))}
         </div>
@@ -281,7 +374,9 @@ function ResumeShell({ data, monochrome = false }) {
                 {item.name.trim()}
                 {item.tech.trim() ? ` | ${item.tech.trim()}` : ''}
               </p>
-              {item.description.trim() ? <p>{item.description.trim()}</p> : null}
+              {extractBullets(item.description).map((bullet, bulletIndex) => (
+                <p key={bulletIndex} className="resume-bullet">- {bullet}</p>
+              ))}
             </div>
           ))}
         </div>
@@ -305,7 +400,7 @@ function ResumeShell({ data, monochrome = false }) {
   )
 }
 
-function ScoreCard({ score, suggestions }) {
+function ScoreCard({ score, suggestions, improvements }) {
   return (
     <section className="card score-card">
       <div className="card-header">ATS Readiness Score</div>
@@ -317,6 +412,7 @@ function ScoreCard({ score, suggestions }) {
         <div className="score-track" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={score}>
           <div className="score-fill" style={{ width: `${score}%` }} />
         </div>
+
         {suggestions.length > 0 ? (
           <ul className="suggestion-list">
             {suggestions.map((text, index) => (
@@ -326,12 +422,25 @@ function ScoreCard({ score, suggestions }) {
         ) : (
           <p className="suggestion-clear">Core ATS checks passed for v1.</p>
         )}
+
+        <div className="improvement-block">
+          <h4>Top 3 Improvements</h4>
+          {improvements.length > 0 ? (
+            <ul className="suggestion-list">
+              {improvements.map((item, index) => (
+                <li key={index}>{item}</li>
+              ))}
+            </ul>
+          ) : (
+            <p className="suggestion-clear">No immediate improvements required for this ruleset.</p>
+          )}
+        </div>
       </div>
     </section>
   )
 }
 
-function BuilderPage({ data, setData, scoreData }) {
+function BuilderPage({ data, setData, scoreData, improvements, selectedTemplate, setSelectedTemplate }) {
   const updatePersonal = (key, value) => {
     setData((prev) => ({ ...prev, personal: { ...prev.personal, [key]: value } }))
   }
@@ -416,8 +525,9 @@ function BuilderPage({ data, setData, scoreData }) {
                   <Field label="End" value={item.end} onChange={(e) => updateListField('experience', index, 'end', e.target.value)} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Details</label>
+                  <label className="form-label">Details (one bullet per line)</label>
                   <textarea className="textarea" value={item.details} onChange={(e) => updateListField('experience', index, 'details', e.target.value)} />
+                  <BulletGuidance text={item.details} />
                 </div>
               </>
             )}
@@ -434,8 +544,9 @@ function BuilderPage({ data, setData, scoreData }) {
                   <Field label="Tech" value={item.tech} onChange={(e) => updateListField('projects', index, 'tech', e.target.value)} />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Description</label>
+                  <label className="form-label">Description (one bullet per line)</label>
                   <textarea className="textarea" value={item.description} onChange={(e) => updateListField('projects', index, 'description', e.target.value)} />
+                  <BulletGuidance text={item.description} />
                 </div>
               </>
             )}
@@ -463,11 +574,17 @@ function BuilderPage({ data, setData, scoreData }) {
         </section>
 
         <aside className="builder-right">
-          <ScoreCard score={scoreData.score} suggestions={scoreData.suggestions} />
+          <section className="card template-card">
+            <div className="card-header">Template</div>
+            <div className="card-body">
+              <TemplateTabs selectedTemplate={selectedTemplate} onSelect={setSelectedTemplate} />
+            </div>
+          </section>
+          <ScoreCard score={scoreData.score} suggestions={scoreData.suggestions} improvements={improvements} />
           <div className="card preview-card">
             <div className="card-header">Live Preview</div>
             <div className="card-body">
-              <ResumeShell data={data} />
+              <ResumeShell data={data} template={selectedTemplate} />
             </div>
           </div>
         </aside>
@@ -476,12 +593,18 @@ function BuilderPage({ data, setData, scoreData }) {
   )
 }
 
-function PreviewPage({ data }) {
+function PreviewPage({ data, selectedTemplate, setSelectedTemplate }) {
   return (
     <div className="page-wrapper preview-page">
       <TopNav />
       <main className="preview-main">
-        <ResumeShell data={data} monochrome />
+        <section className="card template-card preview-template-card">
+          <div className="card-header">Template</div>
+          <div className="card-body">
+            <TemplateTabs selectedTemplate={selectedTemplate} onSelect={setSelectedTemplate} />
+          </div>
+        </section>
+        <ResumeShell data={data} template={selectedTemplate} monochrome />
       </main>
     </div>
   )
@@ -512,17 +635,45 @@ export default function App() {
     }
   })
 
+  const [selectedTemplate, setSelectedTemplate] = useState(() => {
+    try {
+      return normalizeTemplate(localStorage.getItem(TEMPLATE_KEY) || 'classic')
+    } catch {
+      return 'classic'
+    }
+  })
+
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(resumeData))
   }, [resumeData])
 
+  useEffect(() => {
+    localStorage.setItem(TEMPLATE_KEY, selectedTemplate)
+  }, [selectedTemplate])
+
   const scoreData = useMemo(() => calculateAtsV1(resumeData), [resumeData])
+  const improvements = useMemo(() => topImprovements(resumeData), [resumeData])
 
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
-      <Route path="/builder" element={<BuilderPage data={resumeData} setData={setResumeData} scoreData={scoreData} />} />
-      <Route path="/preview" element={<PreviewPage data={resumeData} />} />
+      <Route
+        path="/builder"
+        element={
+          <BuilderPage
+            data={resumeData}
+            setData={setResumeData}
+            scoreData={scoreData}
+            improvements={improvements}
+            selectedTemplate={selectedTemplate}
+            setSelectedTemplate={setSelectedTemplate}
+          />
+        }
+      />
+      <Route
+        path="/preview"
+        element={<PreviewPage data={resumeData} selectedTemplate={selectedTemplate} setSelectedTemplate={setSelectedTemplate} />}
+      />
       <Route path="/proof" element={<ProofPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
