@@ -1,0 +1,181 @@
+/* ==============================
+   KodNest Premium Build System
+   Design Tokens — CSS Custom Properties
+   ============================== */
+
+:root {
+    /* COLOR SYSTEM */
+    --color-background: #F7F6F3;
+    --color-background-rgb: 247, 246, 243;
+    --color-surface: #FFFFFF;
+    --color-surface-secondary: #FAFAF8;
+
+    --color-text-primary: #111111;
+    --color-text-secondary: #666666;
+    --color-text-disabled: #BFBBB3;
+
+    --color-border: #E8E6E1;
+    --color-border-dark: #D0CCBF;
+
+    --color-accent: #8B0000;
+    --color-accent-dark: #6B0000;
+    --color-accent-light: rgba(139, 0, 0, 0.1);
+    --color-accent-rgb: 139, 0, 0;
+
+    --color-success: #4A7C5F;
+    --color-success-bg: #E8F5E9;
+    --color-success-rgb: 74, 124, 95;
+
+    --color-warning: #B8860B;
+    --color-warning-bg: #FFF4E6;
+    --color-warning-rgb: 184, 134, 11;
+
+    --color-error: #C85A54;
+    --color-error-bg: #FEE8E5;
+    --color-error-rgb: 200, 90, 84;
+
+    /* TYPOGRAPHY - Font Families */
+    --font-serif: Georgia, "Times New Roman", serif;
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-mono: "Courier New", Courier, monospace;
+
+    /* TYPOGRAPHY - Sizes */
+    --font-size-xl: 48px;
+    --font-size-lg: 32px;
+    --font-size-md: 24px;
+    --font-size-sm: 20px;
+    --font-size-base: 16px;
+    --font-size-small: 14px;
+    --font-size-xs: 13px;
+    --font-size-code: 14px;
+
+    /* TYPOGRAPHY - Line Heights */
+    --line-height-tight: 1.2;
+    --line-height-heading: 1.3;
+    --line-height-subheading: 1.4;
+    --line-height-body-large: 1.8;
+    --line-height-body: 1.6;
+
+    /* TYPOGRAPHY - Letter Spacing */
+    --letter-spacing-tight: -0.02em;
+    --letter-spacing-tighter: -0.01em;
+    --letter-spacing-normal: 0;
+    --letter-spacing-loose: 0.02em;
+
+    /* SPACING SYSTEM */
+    --spacing-xs: 8px;
+    --spacing-sm: 16px;
+    --spacing-md: 24px;
+    --spacing-lg: 40px;
+    --spacing-xl: 64px;
+
+    /* BORDER RADIUS */
+    --radius-sm: 4px;
+    --radius-md: 6px;
+    --radius-lg: 8px;
+
+    /* TRANSITIONS & TIMING */
+    --transition-fast: 150ms ease-in-out;
+    --transition-normal: 200ms ease-in-out;
+    --timing-function: ease-in-out;
+
+    /* SHADOWS */
+    --shadow-focus: 0 0 0 3px var(--color-accent-light);
+    --shadow-focus-error: 0 0 0 3px rgba(200, 90, 84, 0.1);
+
+    /* LAYOUT */
+    --layout-max-width: 1440px;
+    --layout-padding: 40px;
+    --workspace-width: 70%;
+    --sidebar-width: 30%;
+    --text-max-width: 720px;
+
+    /* COMPONENT HEIGHTS */
+    --topbar-height: 64px;
+    --footer-height-min: 120px;
+
+    /* Z-INDEX SCALE */
+    --z-base: 0;
+    --z-dropdown: 10;
+    --z-sticky: 100;
+    --z-modal: 1000;
+    --z-tooltip: 1100;
+}
+
+/* ==============================
+   SEMANTIC COLOR ALIASES
+   ============================== */
+
+:root {
+    --color-interactive: var(--color-accent);
+    --color-interactive-hover: var(--color-accent-dark);
+    --color-interactive-focus: var(--color-accent);
+
+    --color-input-border: var(--color-border);
+    --color-input-border-hover: var(--color-border-dark);
+    --color-input-border-focus: var(--color-accent);
+    --color-input-border-error: var(--color-error);
+
+    --color-button-primary-bg: var(--color-accent);
+    --color-button-primary-text: var(--color-surface);
+    --color-button-primary-hover: var(--color-accent-dark);
+
+    --color-button-secondary-bg: var(--color-surface);
+    --color-button-secondary-text: var(--color-text-primary);
+    --color-button-secondary-border: var(--color-accent);
+    --color-button-secondary-hover: var(--color-background);
+
+    --color-button-ghost-bg: transparent;
+    --color-button-ghost-text: var(--color-text-primary);
+    --color-button-ghost-hover: var(--color-background);
+
+    --color-badge-default-bg: var(--color-border);
+    --color-badge-default-text: var(--color-text-secondary);
+
+    --color-badge-progress-bg: var(--color-warning-bg);
+    --color-badge-progress-text: var(--color-warning);
+
+    --color-badge-success-bg: var(--color-success-bg);
+    --color-badge-success-text: var(--color-success);
+}
+
+/* ==============================
+   RESPONSIVE BREAKPOINTS
+   ============================== */
+
+/* Desktop: 1440px+ (default) */
+/* Tablet: 768px - 1439px */
+/* Mobile: 320px - 767px */
+
+@media (max-width: 1439px) {
+    :root {
+        --layout-max-width: 100%;
+        --workspace-width: 100%;
+        --sidebar-width: 100%;
+    }
+}
+
+@media (max-width: 767px) {
+    :root {
+        --font-size-xl: 32px;
+        --font-size-lg: 24px;
+        --font-size-md: 20px;
+        --layout-padding: 24px;
+        --spacing-lg: 24px;
+    }
+}
+
+/* ==============================
+   FONT WEIGHT REFERENCE
+   ============================== */
+
+/* System fonts only support 400 and 600/700 */
+/* 400 = Regular/Normal */
+/* 600 = Semi-bold (used for emphasis) */
+/* 700 = Bold (reserve for critical emphasis) */
+
+:root {
+    --font-weight-normal: 400;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+}
