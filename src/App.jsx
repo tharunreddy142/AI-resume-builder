@@ -20,8 +20,12 @@ const emptyResume = {
   summary: '',
   education: [{ school: '', degree: '', start: '', end: '' }],
   experience: [{ company: '', role: '', start: '', end: '', details: '' }],
-  projects: [{ name: '', tech: '', description: '' }],
-  skills: '',
+  projects: [{ title: '', description: '', techStack: [], liveUrl: '', githubUrl: '' }],
+  skills: {
+    technical: [],
+    soft: [],
+    tools: [],
+  },
   links: { github: '', linkedin: '' },
 }
 
@@ -46,21 +50,69 @@ const sampleResume = {
   ],
   projects: [
     {
-      name: 'TaskFlow',
-      tech: 'React, Node.js',
+      title: 'TaskFlow',
       description: 'Built collaborative tracker used by 2k+ users with weekly reports.',
+      techStack: ['React', 'Node.js'],
+      liveUrl: 'https://taskflow.example.com',
+      githubUrl: 'https://github.com/aaravsharma/taskflow',
     },
     {
-      name: 'Resume Lens',
-      tech: 'TypeScript, PostgreSQL',
+      title: 'Resume Lens',
       description: 'Optimized keyword insights and improved relevance score by 18%.',
+      techStack: ['TypeScript', 'PostgreSQL'],
+      liveUrl: '',
+      githubUrl: 'https://github.com/aaravsharma/resume-lens',
     },
   ],
-  skills: 'React, JavaScript, TypeScript, Node.js, SQL, REST APIs, Git, Testing',
+  skills: {
+    technical: ['TypeScript', 'React', 'Node.js', 'PostgreSQL', 'GraphQL'],
+    soft: ['Team Leadership', 'Problem Solving'],
+    tools: ['Git', 'Docker', 'AWS'],
+  },
   links: {
     github: 'github.com/aaravsharma',
     linkedin: 'linkedin.com/in/aaravsharma',
   },
+}
+
+function toSkillArray(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => `${item || ''}`.trim()).filter(Boolean)
+  }
+  if (typeof value === 'string') {
+    return value.split(',').map((item) => item.trim()).filter(Boolean)
+  }
+  return []
+}
+
+function normalizeSkills(rawSkills) {
+  if (!rawSkills || typeof rawSkills !== 'object') {
+    return { technical: [], soft: [], tools: [] }
+  }
+
+  if (typeof rawSkills === 'string') {
+    return {
+      technical: toSkillArray(rawSkills),
+      soft: [],
+      tools: [],
+    }
+  }
+
+  return {
+    technical: toSkillArray(rawSkills.technical),
+    soft: toSkillArray(rawSkills.soft),
+    tools: toSkillArray(rawSkills.tools),
+  }
+}
+
+function normalizeProject(item) {
+  return {
+    title: item?.title || item?.name || '',
+    description: item?.description || '',
+    techStack: toSkillArray(item?.techStack || item?.tech),
+    liveUrl: item?.liveUrl || '',
+    githubUrl: item?.githubUrl || '',
+  }
 }
 
 function normalizeResume(raw) {
@@ -95,13 +147,9 @@ function normalizeResume(raw) {
         : [{ company: '', role: '', start: '', end: '', details: '' }],
     projects:
       Array.isArray(raw.projects) && raw.projects.length > 0
-        ? raw.projects.map((item) => ({
-            name: item?.name || '',
-            tech: item?.tech || '',
-            description: item?.description || '',
-          }))
-        : [{ name: '', tech: '', description: '' }],
-    skills: raw.skills || '',
+        ? raw.projects.map(normalizeProject)
+        : [{ title: '', description: '', techStack: [], liveUrl: '', githubUrl: '' }],
+    skills: normalizeSkills(raw.skills),
     links: {
       github: raw.links?.github || '',
       linkedin: raw.links?.linkedin || '',
@@ -112,6 +160,10 @@ function normalizeResume(raw) {
 function normalizeTemplate(raw) {
   if (raw === 'classic' || raw === 'modern' || raw === 'minimal') return raw
   return 'classic'
+}
+
+function getAllSkills(data) {
+  return [...data.skills.technical, ...data.skills.soft, ...data.skills.tools]
 }
 
 function isEducationPopulated(item) {
@@ -125,7 +177,9 @@ function isExperiencePopulated(item) {
 }
 
 function isProjectPopulated(item) {
-  return Boolean(item.name.trim() || item.tech.trim() || item.description.trim())
+  return Boolean(
+    item.title.trim() || item.description.trim() || item.techStack.length > 0 || item.liveUrl.trim() || item.githubUrl.trim(),
+  )
 }
 
 function hasNumber(text) {
@@ -161,10 +215,7 @@ function calculateAtsV1(data) {
 
   const projectEntries = data.projects.filter(isProjectPopulated)
   const experienceEntries = data.experience.filter(isExperiencePopulated)
-  const skillItems = data.skills
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
+  const skillItems = getAllSkills(data)
 
   const hasLink = Boolean(data.links.github.trim() || data.links.linkedin.trim())
   const completeEducation =
@@ -209,10 +260,7 @@ function topImprovements(data) {
   const summaryWords = data.summary.trim().split(/\s+/).filter(Boolean).length
   const projectEntries = data.projects.filter(isProjectPopulated)
   const experienceEntries = data.experience.filter(isExperiencePopulated)
-  const skillItems = data.skills
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
+  const skillItems = getAllSkills(data)
   const hasQuantifiedImpact =
     [...experienceEntries.map((item) => item.details), ...projectEntries.map((item) => item.description)]
       .some((text) => hasNumber(text || ''))
@@ -242,10 +290,6 @@ function buildResumePlainText(data) {
   const educationEntries = data.education.filter(isEducationPopulated)
   const experienceEntries = data.experience.filter(isExperiencePopulated)
   const projectEntries = data.projects.filter(isProjectPopulated)
-  const skills = data.skills
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
   const contact = [data.personal.email.trim(), data.personal.phone.trim(), data.personal.location.trim()]
     .filter(Boolean)
     .join(' | ')
@@ -265,6 +309,7 @@ function buildResumePlainText(data) {
   } else {
     lines.push('N/A')
   }
+
   lines.push('')
   lines.push('Experience')
   if (experienceEntries.length > 0) {
@@ -275,19 +320,26 @@ function buildResumePlainText(data) {
   } else {
     lines.push('N/A')
   }
+
   lines.push('')
   lines.push('Projects')
   if (projectEntries.length > 0) {
     projectEntries.forEach((item) => {
-      lines.push(`- ${item.name.trim() || 'Project'}${item.tech.trim() ? ` | ${item.tech.trim()}` : ''}`)
-      extractBullets(item.description).forEach((bullet) => lines.push(`  * ${bullet}`))
+      lines.push(`- ${item.title.trim() || 'Project'}`)
+      if (item.description.trim()) lines.push(`  * ${item.description.trim()}`)
+      if (item.techStack.length > 0) lines.push(`  * Tech: ${item.techStack.join(', ')}`)
+      if (item.liveUrl.trim()) lines.push(`  * Live: ${item.liveUrl.trim()}`)
+      if (item.githubUrl.trim()) lines.push(`  * GitHub: ${item.githubUrl.trim()}`)
     })
   } else {
     lines.push('N/A')
   }
+
   lines.push('')
   lines.push('Skills')
-  lines.push(skills.length > 0 ? skills.join(', ') : 'N/A')
+  lines.push(`Technical Skills: ${data.skills.technical.join(', ') || 'N/A'}`)
+  lines.push(`Soft Skills: ${data.skills.soft.join(', ') || 'N/A'}`)
+  lines.push(`Tools & Technologies: ${data.skills.tools.join(', ') || 'N/A'}`)
   lines.push('')
   lines.push('Links')
   lines.push(`GitHub: ${data.links.github.trim() || 'N/A'}`)
@@ -358,6 +410,51 @@ function ListSection({ title, items, onAdd, renderItem }) {
   )
 }
 
+function AccordionCard({ title, children, isOpen, onToggle, rightAction = null }) {
+  return (
+    <section className="card form-card">
+      <div className="card-header row-between accordion-head">
+        <button type="button" className="accordion-toggle" onClick={onToggle}>
+          <span>{title}</span>
+          <span>{isOpen ? '−' : '+'}</span>
+        </button>
+        {rightAction}
+      </div>
+      {isOpen ? <div className="card-body">{children}</div> : null}
+    </section>
+  )
+}
+
+function SkillCategory({ label, skills, inputValue, onInputChange, onInputEnter, onRemove }) {
+  return (
+    <div className="skill-group">
+      <label className="form-label">{label} ({skills.length})</label>
+      <div className="chip-row">
+        {skills.map((skill) => (
+          <span key={skill} className="chip">
+            {skill}
+            <button type="button" className="chip-remove" onClick={() => onRemove(skill)} aria-label={`Remove ${skill}`}>
+              X
+            </button>
+          </span>
+        ))}
+      </div>
+      <input
+        className="input"
+        value={inputValue}
+        placeholder="Type a skill and press Enter"
+        onChange={(event) => onInputChange(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault()
+            onInputEnter()
+          }
+        }}
+      />
+    </div>
+  )
+}
+
 function BulletGuidance({ text }) {
   const checks = evaluateBullets(text)
   const issues = checks.filter((item) => !item.hasVerb || !item.hasNumber)
@@ -381,10 +478,6 @@ function ResumeShell({ data, template = 'classic', monochrome = false }) {
   const educationEntries = data.education.filter(isEducationPopulated)
   const experienceEntries = data.experience.filter(isExperiencePopulated)
   const projectEntries = data.projects.filter(isProjectPopulated)
-  const skillItems = data.skills
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
   const showLinks = data.links.github.trim() || data.links.linkedin.trim()
 
   const contactLine = [data.personal.email.trim(), data.personal.phone.trim(), data.personal.location.trim()]
@@ -437,24 +530,53 @@ function ResumeShell({ data, template = 'classic', monochrome = false }) {
       {projectEntries.length > 0 ? (
         <div className="resume-block">
           <h3>Projects</h3>
-          {projectEntries.map((item, idx) => (
-            <div key={idx} className="resume-subblock">
-              <p>
-                {item.name.trim()}
-                {item.tech.trim() ? ` | ${item.tech.trim()}` : ''}
-              </p>
-              {extractBullets(item.description).map((bullet, bulletIndex) => (
-                <p key={bulletIndex} className="resume-bullet">- {bullet}</p>
-              ))}
-            </div>
-          ))}
+          <div className="project-preview-grid">
+            {projectEntries.map((item, idx) => (
+              <div key={idx} className="project-preview-card">
+                <p className="project-preview-title">{item.title.trim() || 'Project'}</p>
+                {item.description.trim() ? <p>{item.description.trim()}</p> : null}
+                {item.techStack.length > 0 ? (
+                  <div className="chip-row preview-chip-row">
+                    {item.techStack.map((tech) => <span key={tech} className="chip chip-static">{tech}</span>)}
+                  </div>
+                ) : null}
+                <div className="project-links">
+                  {item.liveUrl.trim() ? <a href={item.liveUrl.trim()} target="_blank" rel="noreferrer" className="link-icon">🔗 Live</a> : null}
+                  {item.githubUrl.trim() ? <a href={item.githubUrl.trim()} target="_blank" rel="noreferrer" className="link-icon">⌘ GitHub</a> : null}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       ) : null}
 
-      {skillItems.length > 0 ? (
+      {getAllSkills(data).length > 0 ? (
         <div className="resume-block">
           <h3>Skills</h3>
-          <p>{skillItems.join(', ')}</p>
+          {data.skills.technical.length > 0 ? (
+            <div className="skill-preview-group">
+              <p className="skill-group-label">Technical Skills</p>
+              <div className="chip-row preview-chip-row">
+                {data.skills.technical.map((skill) => <span key={skill} className="chip chip-static">{skill}</span>)}
+              </div>
+            </div>
+          ) : null}
+          {data.skills.soft.length > 0 ? (
+            <div className="skill-preview-group">
+              <p className="skill-group-label">Soft Skills</p>
+              <div className="chip-row preview-chip-row">
+                {data.skills.soft.map((skill) => <span key={skill} className="chip chip-static">{skill}</span>)}
+              </div>
+            </div>
+          ) : null}
+          {data.skills.tools.length > 0 ? (
+            <div className="skill-preview-group">
+              <p className="skill-group-label">Tools & Technologies</p>
+              <div className="chip-row preview-chip-row">
+                {data.skills.tools.map((skill) => <span key={skill} className="chip chip-static">{skill}</span>)}
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -510,6 +632,13 @@ function ScoreCard({ score, suggestions, improvements }) {
 }
 
 function BuilderPage({ data, setData, scoreData, improvements, selectedTemplate, setSelectedTemplate }) {
+  const [skillsOpen, setSkillsOpen] = useState(true)
+  const [projectsOpen, setProjectsOpen] = useState(true)
+  const [suggestingSkills, setSuggestingSkills] = useState(false)
+  const [skillInput, setSkillInput] = useState({ technical: '', soft: '', tools: '' })
+  const [projectTechInput, setProjectTechInput] = useState({})
+  const [openProjects, setOpenProjects] = useState(() => new Set([0]))
+
   const updatePersonal = (key, value) => {
     setData((prev) => ({ ...prev, personal: { ...prev.personal, [key]: value } }))
   }
@@ -526,6 +655,105 @@ function BuilderPage({ data, setData, scoreData, improvements, selectedTemplate,
     setData((prev) => ({
       ...prev,
       [section]: prev[section].map((item, idx) => (idx === index ? { ...item, [key]: value } : item)),
+    }))
+  }
+
+  const addSkill = (category) => {
+    const value = skillInput[category].trim()
+    if (!value) return
+    setData((prev) => {
+      if (prev.skills[category].some((skill) => skill.toLowerCase() === value.toLowerCase())) return prev
+      return {
+        ...prev,
+        skills: {
+          ...prev.skills,
+          [category]: [...prev.skills[category], value],
+        },
+      }
+    })
+    setSkillInput((prev) => ({ ...prev, [category]: '' }))
+  }
+
+  const removeSkill = (category, value) => {
+    setData((prev) => ({
+      ...prev,
+      skills: {
+        ...prev.skills,
+        [category]: prev.skills[category].filter((skill) => skill !== value),
+      },
+    }))
+  }
+
+  const suggestSkills = () => {
+    setSuggestingSkills(true)
+    setTimeout(() => {
+      const suggested = {
+        technical: ['TypeScript', 'React', 'Node.js', 'PostgreSQL', 'GraphQL'],
+        soft: ['Team Leadership', 'Problem Solving'],
+        tools: ['Git', 'Docker', 'AWS'],
+      }
+      setData((prev) => ({
+        ...prev,
+        skills: {
+          technical: [...new Set([...prev.skills.technical, ...suggested.technical])],
+          soft: [...new Set([...prev.skills.soft, ...suggested.soft])],
+          tools: [...new Set([...prev.skills.tools, ...suggested.tools])],
+        },
+      }))
+      setSuggestingSkills(false)
+    }, 1000)
+  }
+
+  const addProject = () => {
+    const nextIndex = data.projects.length
+    addEntry('projects', { title: '', description: '', techStack: [], liveUrl: '', githubUrl: '' })
+    setOpenProjects((prev) => new Set([...prev, nextIndex]))
+  }
+
+  const deleteProject = (index) => {
+    setData((prev) => ({
+      ...prev,
+      projects: prev.projects.filter((_, idx) => idx !== index),
+    }))
+    setOpenProjects((prev) => {
+      const next = new Set()
+      prev.forEach((value) => {
+        if (value < index) next.add(value)
+        if (value > index) next.add(value - 1)
+      })
+      return next
+    })
+  }
+
+  const toggleProject = (index) => {
+    setOpenProjects((prev) => {
+      const next = new Set(prev)
+      if (next.has(index)) next.delete(index)
+      else next.add(index)
+      return next
+    })
+  }
+
+  const addProjectTech = (index) => {
+    const value = (projectTechInput[index] || '').trim()
+    if (!value) return
+    setData((prev) => ({
+      ...prev,
+      projects: prev.projects.map((item, idx) => {
+        if (idx !== index) return item
+        if (item.techStack.some((tech) => tech.toLowerCase() === value.toLowerCase())) return item
+        return { ...item, techStack: [...item.techStack, value] }
+      }),
+    }))
+    setProjectTechInput((prev) => ({ ...prev, [index]: '' }))
+  }
+
+  const removeProjectTech = (index, tech) => {
+    setData((prev) => ({
+      ...prev,
+      projects: prev.projects.map((item, idx) =>
+        idx === index ? { ...item, techStack: item.techStack.filter((entry) => entry !== tech) } : item,
+      ),
     }))
   }
 
@@ -602,36 +830,139 @@ function BuilderPage({ data, setData, scoreData, improvements, selectedTemplate,
             )}
           />
 
-          <ListSection
-            title="Projects"
-            items={data.projects}
-            onAdd={() => addEntry('projects', { name: '', tech: '', description: '' })}
-            renderItem={(item, index) => (
-              <>
-                <div className="grid-two">
-                  <Field label="Name" value={item.name} onChange={(e) => updateListField('projects', index, 'name', e.target.value)} />
-                  <Field label="Tech" value={item.tech} onChange={(e) => updateListField('projects', index, 'tech', e.target.value)} />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Description (one bullet per line)</label>
-                  <textarea className="textarea" value={item.description} onChange={(e) => updateListField('projects', index, 'description', e.target.value)} />
-                  <BulletGuidance text={item.description} />
-                </div>
-              </>
-            )}
-          />
-
-          <section className="card form-card">
-            <div className="card-header">Skills</div>
-            <div className="card-body">
-              <input
-                className="input"
-                value={data.skills}
-                onChange={(e) => setData((prev) => ({ ...prev, skills: e.target.value }))}
-                placeholder="React, JavaScript, Node.js"
+          <AccordionCard
+            title="Skills"
+            isOpen={skillsOpen}
+            onToggle={() => setSkillsOpen((prev) => !prev)}
+            rightAction={
+              <button type="button" className="btn btn-secondary btn-sm" onClick={suggestSkills} disabled={suggestingSkills}>
+                {suggestingSkills ? 'Suggesting...' : '✨ Suggest Skills'}
+              </button>
+            }
+          >
+            <div className="list-stack">
+              <SkillCategory
+                label="Technical Skills"
+                skills={data.skills.technical}
+                inputValue={skillInput.technical}
+                onInputChange={(value) => setSkillInput((prev) => ({ ...prev, technical: value }))}
+                onInputEnter={() => addSkill('technical')}
+                onRemove={(value) => removeSkill('technical', value)}
+              />
+              <SkillCategory
+                label="Soft Skills"
+                skills={data.skills.soft}
+                inputValue={skillInput.soft}
+                onInputChange={(value) => setSkillInput((prev) => ({ ...prev, soft: value }))}
+                onInputEnter={() => addSkill('soft')}
+                onRemove={(value) => removeSkill('soft', value)}
+              />
+              <SkillCategory
+                label="Tools & Technologies"
+                skills={data.skills.tools}
+                inputValue={skillInput.tools}
+                onInputChange={(value) => setSkillInput((prev) => ({ ...prev, tools: value }))}
+                onInputEnter={() => addSkill('tools')}
+                onRemove={(value) => removeSkill('tools', value)}
               />
             </div>
-          </section>
+          </AccordionCard>
+
+          <AccordionCard
+            title="Projects"
+            isOpen={projectsOpen}
+            onToggle={() => setProjectsOpen((prev) => !prev)}
+            rightAction={
+              <button type="button" className="btn btn-secondary btn-sm" onClick={addProject}>Add Project</button>
+            }
+          >
+            <div className="project-list">
+              {data.projects.map((project, index) => {
+                const open = openProjects.has(index)
+                const headerLabel = project.title.trim() || `Untitled Project ${index + 1}`
+                return (
+                  <article key={index} className="project-editor-card">
+                    <div className="project-editor-head">
+                      <button type="button" className="project-title-toggle" onClick={() => toggleProject(index)}>
+                        {headerLabel}
+                      </button>
+                      <div className="project-head-actions">
+                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => toggleProject(index)}>
+                          {open ? 'Collapse' : 'Expand'}
+                        </button>
+                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => deleteProject(index)}>
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+
+                    {open ? (
+                      <div className="project-editor-body">
+                        <Field
+                          label="Project Title"
+                          value={project.title}
+                          onChange={(e) => updateListField('projects', index, 'title', e.target.value)}
+                        />
+                        <div className="form-group">
+                          <label className="form-label">Description</label>
+                          <textarea
+                            className="textarea"
+                            maxLength={200}
+                            value={project.description}
+                            onChange={(e) => updateListField('projects', index, 'description', e.target.value)}
+                          />
+                          <p className="char-counter">{project.description.length}/200</p>
+                          <BulletGuidance text={project.description} />
+                        </div>
+
+                        <div className="form-group">
+                          <label className="form-label">Tech Stack</label>
+                          <div className="chip-row">
+                            {project.techStack.map((tech) => (
+                              <span key={tech} className="chip">
+                                {tech}
+                                <button
+                                  type="button"
+                                  className="chip-remove"
+                                  onClick={() => removeProjectTech(index, tech)}
+                                  aria-label={`Remove ${tech}`}
+                                >
+                                  X
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                          <input
+                            className="input"
+                            value={projectTechInput[index] || ''}
+                            placeholder="Type tech and press Enter"
+                            onChange={(e) => setProjectTechInput((prev) => ({ ...prev, [index]: e.target.value }))}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                addProjectTech(index)
+                              }
+                            }}
+                          />
+                        </div>
+
+                        <Field
+                          label="Live URL (optional)"
+                          value={project.liveUrl}
+                          onChange={(e) => updateListField('projects', index, 'liveUrl', e.target.value)}
+                        />
+                        <Field
+                          label="GitHub URL (optional)"
+                          value={project.githubUrl}
+                          onChange={(e) => updateListField('projects', index, 'githubUrl', e.target.value)}
+                        />
+                      </div>
+                    ) : null}
+                  </article>
+                )
+              })}
+            </div>
+          </AccordionCard>
 
           <section className="card form-card">
             <div className="card-header">Links</div>
