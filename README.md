@@ -2,6 +2,40 @@
 
 AI Resume Builder is a premium, structured web app focused on helping users create a high-quality resume with deterministic scoring, visual templates, and persistent workflow state.
 
+## Detailed Product Description
+AI Resume Builder is designed as a practical career-readiness workspace where users can build, evaluate, and improve resumes in one continuous flow. Instead of treating resume creation as a one-time form, the product combines guided authoring, visual rendering, and deterministic quality feedback so users can iterate quickly and confidently.
+
+The product experience starts with a structured resume editor (`/resume`) where each section is intentionally broken down to reduce cognitive load:
+- Personal profile and summary for core identity and positioning
+- Education and experience for timeline and credibility
+- Projects and skills for technical proof and relevance
+- External links for portfolio visibility
+
+Skills and projects are implemented with interactive accordions and chip-based editing to support real-world resume writing behavior:
+- Skills are categorized into Technical Skills, Soft Skills, and Tools & Technologies
+- Projects support title, concise description, tech stack chips, and optional URLs
+- Inline guidance nudges users toward stronger bullets and measurable impact
+
+The analysis layer (`/analyze`) is the product’s quality engine:
+- Live resume preview rendered in selectable templates (Classic, Modern, Minimal)
+- Color customization to tune brand style without changing content quality
+- Deterministic ATS scoring that updates as users edit
+- Improvement suggestions that identify missing scoring criteria
+- Export actions (download/print flow + plain-text copy) for practical application use
+
+Persistence is a core product guarantee:
+- Editing state is continuously saved in localStorage
+- Template and color preferences are retained across sessions
+- App-level state tracks readiness context, including weighted readiness scoring inputs
+
+From a product perspective, this creates a reliable loop:
+1. Build resume content
+2. Analyze score and suggestions
+3. Refine weak areas
+4. Export and apply
+
+The result is a resume workflow that is structured, measurable, and fast to iterate, with enough scaffolding to expand into job matching, applications tracking, dashboard analytics, and settings without breaking the existing user model.
+
 ## Product Vision
 The product is designed around three principles:
 - Clarity: users always see what they have built and what is missing.
